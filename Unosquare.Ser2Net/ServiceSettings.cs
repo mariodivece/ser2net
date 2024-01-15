@@ -8,6 +8,11 @@ internal class ServiceSettings
 
     public string Message { get; set; } = string.Empty;
 
-
     public string ServerIP { get; set; } = IPAddress.Any.ToString();
+
+    public int ServerPort { get; set; } = Constants.DefaultServerPort;
+
+    public string PortName { get; set; } = string.Empty;
+
+    public int BaudRate { get; set; } = Constants.DefaultBaudRate;
 }

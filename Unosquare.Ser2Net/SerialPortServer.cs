@@ -1,4 +1,7 @@
-﻿using System.Net;
+﻿using System.Buffers;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 
 namespace Unosquare.Ser2Net;
 
@@ -56,29 +59,55 @@ internal sealed class SerialPortServer : BackgroundService
         try
         {
             var settings = ReadSettings();
+            var serverAddress = ParseServerAddress(settings);
+            var serverEndpoint = new IPEndPoint(serverAddress, settings.ServerPort);
+            using var server = new TcpListener(serverEndpoint);
+            server.Start();
 
-            if (!IPAddress.TryParse(settings.ServerIP, out var serverIP))
+            while (!stoppingToken.IsCancellationRequested)
             {
-                Logger.LogWarning("Settings Server IP '{ServerIP}' is invalid. Will use all available local addresses.", settings.ServerIP);
-                serverIP = IPAddress.Any;
-            }
-            else
-            {
-                Logger.LogInformation("Server IP: {ServerIP}", settings.ServerIP);
-            }
-                
+                using var client = await server.AcceptTcpClientAsync(stoppingToken).ConfigureAwait(false);
+                Logger.LogInformation("Client {EndPoint} accepted", client.Client.RemoteEndPoint);
+                client.NoDelay = true;
+                client.SendBufferSize = 1;
+                client.ReceiveBufferSize = 1;
+                var stream = client.GetStream();
+                var bufferSize = 1; // Math.Max(1024, settings.BaudRate / 8);
+                using var readBuffer = MemoryPool<byte>.Shared.Rent(bufferSize);
+                var receivedText = new StringBuilder(bufferSize);
 
-            var count = 0;
-            while (!stoppingToken.IsCancellationRequested && count < 3)
-            {
-                await Task.Delay(1000, stoppingToken).ConfigureAwait(false);
-                Logger.LogInformation(settings.Message, count);
-                count++;
+                await stream.WriteAsync(Encoding.UTF8.GetBytes("Hello from TCP!"), stoppingToken);
+
+                while (!client.Client.Poll(1, SelectMode.SelectRead) && !stoppingToken.IsCancellationRequested)
+                {
+                    receivedText.Clear();
+
+                    do
+                    {
+                        var readByteCount = await stream.ReadAsync(readBuffer.Memory, stoppingToken);
+                        if (readByteCount > 0)
+                        {
+                            var readText = Encoding.UTF8.GetString(readBuffer.Memory.Span[..readByteCount]);
+                            receivedText.Append(readText);
+                        }
+                    } while (client.Available > 0);
+                    
+                    if (receivedText.Length > 0)
+                    {
+                        var sendBuffer = Encoding.UTF8.GetBytes(receivedText.ToString());
+                        await stream.WriteAsync(sendBuffer, stoppingToken);
+                    }
+                    
+                }
+
+                Logger.LogInformation("Client {EndPoint} disconnected.", client.Client.RemoteEndPoint);
             }
+
+            server.Stop();
 
             Environment.ExitCode = Constants.ExitCodeSuccess;
         }
-        catch
+        catch(Exception ex)
         {
             Environment.ExitCode = Constants.ExitCodeFailure;
         }
@@ -93,5 +122,20 @@ internal sealed class SerialPortServer : BackgroundService
         var settings = new ServiceSettings();
         Configuration.GetRequiredSection(ServiceSettings.SectionName).Bind(settings);
         return settings;
+    }
+
+    private IPAddress ParseServerAddress(ServiceSettings settings)
+    {
+        if (!IPAddress.TryParse(settings.ServerIP, out var serverIP))
+        {
+            Logger.LogWarning("Settings Server IP '{ServerIP}' is invalid. Will use all available local addresses.", settings.ServerIP);
+            serverIP = Constants.DefaultServerIP;
+        }
+        else
+        {
+            Logger.LogInformation("Server IP: {ServerIP}", settings.ServerIP);
+        }
+
+        return serverIP;
     }
 }
