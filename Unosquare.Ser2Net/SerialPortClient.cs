@@ -5,6 +5,7 @@ internal sealed class SerialPortClient : IDisposable
     private bool isDisposed;
     private readonly IMemoryOwner<byte> readBuffer;
     private bool _IsConnected = true;
+    private readonly SemaphoreSlim AsyncRoot = new(1, 1);
 
     private SerialPortClient(SerialPortServer server, TcpClient client)
     {
@@ -73,8 +74,12 @@ internal sealed class SerialPortClient : IDisposable
         if (buffer.Length <= 0)
             return;
 
+        var hasErrors = false;
+
         try
         {
+            await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+
             if (!IsConnected)
                 throw new SocketException((int)SocketError.NotConnected);
 
@@ -82,16 +87,26 @@ internal sealed class SerialPortClient : IDisposable
         }
         catch (Exception ex)
         {
+            hasErrors = true;
             Logger.LogError("Client [{EndPoint}] Could not write to network stream.\r\n{ErrorMessage}", RemoteEndPoint, ex.Message);
             Dispose(alsoManaged: true);
             throw;
+        }
+        finally
+        {
+            if (!hasErrors)
+                AsyncRoot.Release();
         }
     }
 
     public async ValueTask<ReadOnlyMemory<byte>> ReadAsync(CancellationToken cancellationToken)
     {
+
+        var hasErrors = false;
         try
         {
+            await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+
             var length = 0;
 
             if (!IsConnected)
@@ -112,9 +127,15 @@ internal sealed class SerialPortClient : IDisposable
         }
         catch (Exception ex)
         {
+            hasErrors = true;
             Logger.LogError("Client [{EndPoint}] Could not read from network stream.\r\n{ErrorMessage}", RemoteEndPoint, ex.Message);
             Dispose(alsoManaged: true);
             throw;
+        }
+        finally
+        {
+            if (!hasErrors)
+                AsyncRoot.Release();
         }
     }
 
@@ -135,6 +156,7 @@ internal sealed class SerialPortClient : IDisposable
             _IsConnected = false;
             NetworkClient.Close();
             readBuffer.Dispose();
+            AsyncRoot.Dispose();
             Logger.LogInformation("Client [{EndPoint}] Disconnected.", RemoteEndPoint);
         }
     }
