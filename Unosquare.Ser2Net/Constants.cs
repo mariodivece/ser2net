@@ -22,4 +22,8 @@ internal static class Constants
     public const int DefaultDataBits = 8;
 
     public const StopBits DefaultStopBits = StopBits.One;
+
+    public static readonly EndPoint EmptyEndPoint = new IPEndPoint(IPAddress.Any, 0);
+
+    public const int MaxClientCount = 1;
 }

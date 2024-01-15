@@ -10,6 +10,8 @@ namespace Unosquare.Ser2Net;
 /// </summary>
 internal sealed class SerialPortServer : BackgroundService
 {
+    private bool isDisposed;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SerialPortServer"/> class.
     /// </summary>
@@ -31,24 +33,167 @@ internal sealed class SerialPortServer : BackgroundService
         Configuration = configuration;
     }
 
-    private IConfiguration Configuration { get; }
+    public IConfiguration Configuration { get; }
 
     /// <summary>
     /// Gets the lifetime.
     /// </summary>
-    private IHostApplicationLifetime Lifetime { get; }
+    public IHostApplicationLifetime Lifetime { get; }
 
     /// <summary>
     /// Gets the logger.
     /// </summary>
-    private ILogger<SerialPortServer> Logger { get; }
+    public ILogger<SerialPortServer> Logger { get; }
 
-    /// <inheritdoc/>
+    public TcpListener? TcpServer { get; private set; }
+
+    public ServiceSettings Settings { get; private set; }
+
+    private List<SerialPortClient> Clients { get; } = [];
+
+    private void DisconnectClients()
+    {
+        for (var i = Clients.Count - 1; i >= 0; i--)
+            Clients[i].Dispose();
+
+        Clients.Clear();
+    }
+
+    private void Dispose(bool alsoManaged)
+    {
+        if (isDisposed) return;
+        isDisposed = true;
+
+        if (alsoManaged)
+        {
+            DisconnectClients();
+        }
+    }
+
     public override void Dispose()
     {
-        // TODO: HAndle any dispose logic here
         base.Dispose();
-        Logger.LogInformation("Disposing . . .");
+        Dispose(alsoManaged: true);
+        GC.SuppressFinalize(this);
+    }
+
+    public async Task ListenForNetworkClientsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var serverAddress = ParseServerAddress();
+            var serverEndpoint = new IPEndPoint(serverAddress, Settings.ServerPort);
+            TcpServer = new TcpListener(serverEndpoint);
+            TcpServer.Start();
+
+            Logger.LogInformation("Listening for TCP clients on {EndPoint}", serverEndpoint);
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var client = await SerialPortClient.WaitForClientAsync(this, cancellationToken).ConfigureAwait(false);
+                    Logger.LogInformation("Client {EndPoint} Connection accepted.", client.RemoteEndPoint);
+
+                    if (Clients.Count >= Constants.MaxClientCount)
+                    {
+                        Logger.LogWarning("Client [{EndPoint}] rejected because connection count would exceed {MaxConnections}.",
+                            client.RemoteEndPoint, Constants.MaxClientCount);
+
+                        client.Dispose();
+                        client = null;
+                        continue;
+                    }
+
+                    if (!client.IsConnected)
+                    {
+                        Logger.LogWarning("Client [{EndPoint}] did not complete the connection",
+                            client.RemoteEndPoint);
+
+                        client.Dispose();
+                        continue;
+                    }
+
+                    Clients.Add(client);
+                }
+                catch (Exception ex)
+                {
+
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+
+        }
+        finally
+        {
+            Logger.LogInformation("TCP Listener [{EndPoint}] Shutting down . . . ", TcpServer?.LocalEndpoint);
+            TcpServer?.Stop();
+            TcpServer?.Dispose();
+            TcpServer = null;
+            
+        }
+    }
+
+    public async Task RunEchoServer(CancellationToken cancellation)
+    {
+        var builder = new StringBuilder();
+
+        while (!cancellation.IsCancellationRequested)
+        {
+            if (Clients.Count <= 0)
+            {
+                await Task.Delay(1).ConfigureAwait(false);
+                continue;
+            }
+
+            var disconnectedClients = new List<SerialPortClient>(Clients.Count);
+            var readSomething = false;
+
+            foreach (var client in Clients)
+            {
+                try
+                {
+                    var readBuffer = await client.ReadAsync(cancellation).ConfigureAwait(false);
+                    if (readBuffer.Length > 0)
+                        builder.Append(Encoding.UTF8.GetString(readBuffer.Span));
+                }
+                catch
+                {
+                    disconnectedClients.Add(client);
+                }
+            }
+
+            if (builder.Length > 0)
+            {
+                readSomething = true;
+                foreach (var client in Clients.Except(disconnectedClients))
+                {
+                    try
+                    {
+                        await client.WriteAsync(Encoding.UTF8.GetBytes(builder.ToString()), cancellation).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        disconnectedClients.Add(client);
+                    }
+                }
+
+                builder.Clear();
+            }
+
+            foreach (var disconnectedClient in disconnectedClients)
+            {
+                Clients.Remove(disconnectedClient);
+                disconnectedClient.Dispose();
+            }
+
+            if (!readSomething)
+                await Task.Delay(1).ConfigureAwait(false);
+        }
+
+        DisconnectClients();
     }
 
     /// <inheritdoc/>
@@ -58,56 +203,16 @@ internal sealed class SerialPortServer : BackgroundService
 
         try
         {
-            var settings = ReadSettings();
-            var serverAddress = ParseServerAddress(settings);
-            var serverEndpoint = new IPEndPoint(serverAddress, settings.ServerPort);
-            using var server = new TcpListener(serverEndpoint);
-            server.Start();
-
-            while (!stoppingToken.IsCancellationRequested)
+            ReadSettings();
+            var tasks = new List<Task>
             {
-                using var client = await server.AcceptTcpClientAsync(stoppingToken).ConfigureAwait(false);
-                Logger.LogInformation("Client {EndPoint} accepted", client.Client.RemoteEndPoint);
-                client.NoDelay = true;
-                client.SendBufferSize = 1;
-                client.ReceiveBufferSize = 1;
-                var stream = client.GetStream();
-                var bufferSize = 1; // Math.Max(1024, settings.BaudRate / 8);
-                using var readBuffer = MemoryPool<byte>.Shared.Rent(bufferSize);
-                var receivedText = new StringBuilder(bufferSize);
-
-                await stream.WriteAsync(Encoding.UTF8.GetBytes("Hello from TCP!"), stoppingToken);
-
-                while (!client.Client.Poll(1, SelectMode.SelectRead) && !stoppingToken.IsCancellationRequested)
-                {
-                    receivedText.Clear();
-
-                    do
-                    {
-                        var readByteCount = await stream.ReadAsync(readBuffer.Memory, stoppingToken);
-                        if (readByteCount > 0)
-                        {
-                            var readText = Encoding.UTF8.GetString(readBuffer.Memory.Span[..readByteCount]);
-                            receivedText.Append(readText);
-                        }
-                    } while (client.Available > 0);
-                    
-                    if (receivedText.Length > 0)
-                    {
-                        var sendBuffer = Encoding.UTF8.GetBytes(receivedText.ToString());
-                        await stream.WriteAsync(sendBuffer, stoppingToken);
-                    }
-                    
-                }
-
-                Logger.LogInformation("Client {EndPoint} disconnected.", client.Client.RemoteEndPoint);
-            }
-
-            server.Stop();
-
+                ListenForNetworkClientsAsync(stoppingToken),
+                RunEchoServer(stoppingToken),
+            };
+            await Task.WhenAll(tasks).ConfigureAwait(false);
             Environment.ExitCode = Constants.ExitCodeSuccess;
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Environment.ExitCode = Constants.ExitCodeFailure;
         }
@@ -117,23 +222,23 @@ internal sealed class SerialPortServer : BackgroundService
         }
     }
 
-    private ServiceSettings ReadSettings()
+    private void ReadSettings()
     {
         var settings = new ServiceSettings();
         Configuration.GetRequiredSection(ServiceSettings.SectionName).Bind(settings);
-        return settings;
+        Settings = settings;
     }
 
-    private IPAddress ParseServerAddress(ServiceSettings settings)
+    private IPAddress ParseServerAddress()
     {
-        if (!IPAddress.TryParse(settings.ServerIP, out var serverIP))
+        if (!IPAddress.TryParse(Settings.ServerIP, out var serverIP))
         {
-            Logger.LogWarning("Settings Server IP '{ServerIP}' is invalid. Will use all available local addresses.", settings.ServerIP);
+            Logger.LogWarning("Settings Server IP '{ServerIP}' is invalid. Will use all available local addresses.", Settings.ServerIP);
             serverIP = Constants.DefaultServerIP;
         }
         else
         {
-            Logger.LogInformation("Server IP: {ServerIP}", settings.ServerIP);
+            Logger.LogInformation("Server IP: {ServerIP}", Settings.ServerIP);
         }
 
         return serverIP;
