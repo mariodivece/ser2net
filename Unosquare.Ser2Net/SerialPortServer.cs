@@ -47,7 +47,7 @@ internal sealed class SerialPortServer : BackgroundService
 
     public TcpListener? TcpServer { get; private set; }
 
-    public ServiceSettings Settings { get; private set; }
+    public ServiceSettings Settings { get; } = new();
 
     private List<SerialPortClient> Clients { get; } = [];
 
@@ -224,9 +224,7 @@ internal sealed class SerialPortServer : BackgroundService
 
     private void ReadSettings()
     {
-        var settings = new ServiceSettings();
-        Configuration.GetRequiredSection(ServiceSettings.SectionName).Bind(settings);
-        Settings = settings;
+        Configuration.GetRequiredSection(ServiceSettings.SectionName).Bind(Settings);
     }
 
     private IPAddress ParseServerAddress()
