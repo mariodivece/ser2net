@@ -1,23 +1,16 @@
-﻿namespace Unosquare.Ser2Net;
+﻿namespace Unosquare.Ser2Net.Workers;
 
-internal class NetworkDataSender : BackgroundService
+internal class NetDataSender : BufferWorkerBase<NetDataSender>
 {
-    public NetworkDataSender(ILogger<NetworkDataSender> logger, NetworkServer server, BufferQueue<byte> bufferQueue)
+    public NetDataSender(ILogger<NetDataSender> logger, ServiceSettings settings, BufferQueue<byte> bufferQueue, NetServer server)
+        : base(logger, settings, bufferQueue)
     {
-        ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(server);
-        ArgumentNullException.ThrowIfNull(bufferQueue);
 
-        Logger = logger;
         Server = server;
-        BufferQueue = bufferQueue;
     }
 
-    private ILogger<NetworkDataSender> Logger { get; }
-
-    private NetworkServer Server { get; }
-
-    private BufferQueue<byte> BufferQueue { get; }
+    private NetServer Server { get; }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

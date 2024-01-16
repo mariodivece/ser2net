@@ -79,9 +79,9 @@ internal static class BuilderExtensions
                 .AddHostedService<MainHostedService>()
                 .AddSingleton<ServiceSettings>()
                 .AddSingleton<BufferQueue<byte>>()
-                .AddSingleton<NetworkServer>()
-                .AddSingleton<NetworkDataReceiver>()
-                .AddSingleton<NetworkDataSender>()
+                .AddSingleton<NetServer>()
+                .AddSingleton<NetDataReceiver>()
+                .AddSingleton<NetDataSender>()
                 .AddTransient<NetworkClient>();
         });
 

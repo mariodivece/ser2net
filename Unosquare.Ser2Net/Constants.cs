@@ -1,7 +1,4 @@
-﻿using System.IO.Ports;
-using System.Net;
-
-namespace Unosquare.Ser2Net;
+﻿namespace Unosquare.Ser2Net;
 
 internal static class Constants
 {

@@ -1,8 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.IO.Ports;
-
-namespace Unosquare.Ser2Net;
+﻿namespace Unosquare.Ser2Net.Services;
 
 internal class ServiceSettings
 {

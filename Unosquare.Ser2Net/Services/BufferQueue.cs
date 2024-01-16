@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace Unosquare.Ser2Net;
+﻿namespace Unosquare.Ser2Net.Services;
 
 /// <summary>
 /// Defines a class that represents a generic resizable circular queue.
@@ -141,8 +139,8 @@ public sealed class BufferQueue<T> : IDisposable
 
         lock (SyncLock)
         {
-            if ((Count + inputCount) > Capacity)
-                Reallocate((Count + inputCount + CapacityGrowth) & ~CapacityGrowth);
+            if (Count + inputCount > Capacity)
+                Reallocate(Count + inputCount + CapacityGrowth & ~CapacityGrowth);
 
             if (ReadHead < WriteTail)
             {

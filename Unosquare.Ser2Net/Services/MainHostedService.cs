@@ -1,9 +1,9 @@
-﻿namespace Unosquare.Ser2Net;
+﻿namespace Unosquare.Ser2Net.Services;
 
 /// <summary>
 /// The main service host.
 /// </summary>
-internal sealed class MainHostedService : BackgroundService
+internal sealed class MainHostedService : WorkerBase<MainHostedService>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="MainHostedService"/> class.
@@ -15,21 +15,17 @@ internal sealed class MainHostedService : BackgroundService
         ILogger<MainHostedService> logger,
         ServiceSettings settings,
         IHostApplicationLifetime lifetime,
-        NetworkServer networkServer,
-        NetworkDataSender networkDataSender,
-        NetworkDataReceiver networkDataReceiver)
-        : base()
+        NetServer networkServer,
+        NetDataSender networkDataSender,
+        NetDataReceiver networkDataReceiver)
+        : base(logger, settings)
     {
-        ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(lifetime);
-        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(networkServer);
         ArgumentNullException.ThrowIfNull(networkDataSender);
         ArgumentNullException.ThrowIfNull(networkDataReceiver);
 
-        Logger = logger;
         Lifetime = lifetime;
-        Settings = settings;
         NetworkServer = networkServer;
         NetworkDataSender = networkDataSender;
         NetworkDataReceiver = networkDataReceiver;
@@ -40,15 +36,11 @@ internal sealed class MainHostedService : BackgroundService
     /// </summary>
     private IHostApplicationLifetime Lifetime { get; }
 
-    private ServiceSettings Settings { get; }
+    private NetServer NetworkServer { get; }
 
-    private ILogger<MainHostedService> Logger { get; }
+    private NetDataSender NetworkDataSender { get; }
 
-    private NetworkServer NetworkServer { get; }
-
-    private NetworkDataSender NetworkDataSender { get; }
-
-    private NetworkDataReceiver NetworkDataReceiver { get; }
+    private NetDataReceiver NetworkDataReceiver { get; }
 
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -59,10 +51,10 @@ internal sealed class MainHostedService : BackgroundService
         {
             Environment.ExitCode = Constants.ExitCodeSuccess;
 
-            await RunBackgroundServices(stoppingToken,
+            await RunBackgroundServicesAsync(stoppingToken,
                 NetworkServer,
                 NetworkDataReceiver,
-                NetworkDataSender);            
+                NetworkDataSender);
         }
         catch (TaskCanceledException)
         {
@@ -78,7 +70,7 @@ internal sealed class MainHostedService : BackgroundService
         }
     }
 
-    private static async Task RunBackgroundServices(CancellationToken stoppingToken, params BackgroundService[] workers)
+    private static async Task RunBackgroundServicesAsync(CancellationToken stoppingToken, params BackgroundService[] workers)
     {
         var tasks = new List<Task>(workers.Length);
         foreach (var worker in workers)

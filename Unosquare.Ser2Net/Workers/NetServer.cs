@@ -1,31 +1,20 @@
-﻿using System.Collections.Concurrent;
+﻿namespace Unosquare.Ser2Net.Workers;
 
-namespace Unosquare.Ser2Net;
-
-internal sealed class NetworkServer : BackgroundService
+internal sealed class NetServer : WorkerBase<NetServer>
 {
     private int ClientId;
     private readonly ConcurrentDictionary<int, NetworkClient> m_Clients = new();
 
-    public NetworkServer(ILogger<NetworkServer> logger,
+    public NetServer(ILogger<NetServer> logger,
         ServiceSettings settings,
         IServiceProvider services)
-        : base()
+        : base(logger, settings)
     {
-        ArgumentNullException.ThrowIfNull(logger);
-        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(services);
-
-        Logger = logger;
-        Settings = settings;
         Services = services;
     }
 
-    private ServiceSettings Settings { get; }
-
     private IServiceProvider Services { get; }
-
-    private ILogger<NetworkServer> Logger { get; }
 
     public IReadOnlyList<NetworkClient> Clients => m_Clients.Values.ToArray();
 
