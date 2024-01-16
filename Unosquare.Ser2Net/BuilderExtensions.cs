@@ -1,18 +1,19 @@
 ﻿using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Hosting.WindowsServices;
-using Microsoft.Extensions.Logging.Configuration;
 using Microsoft.Extensions.Logging.Console;
-using Microsoft.Extensions.Logging.EventLog;
-using Microsoft.Extensions.Logging.EventSource;
 using Serilog;
-using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace Unosquare.Ser2Net;
 
-internal static class HostBuilderExtensions
+/// <summary>
+/// Host builder extension methods.
+/// </summary>
+internal static class BuilderExtensions
 {
     /// <summary>
-    /// Extension method that configures the lifetime and logging of the host.
+    /// Extension method that configures the lifetime and logging of the host,
+    /// depending on its platform.
     /// </summary>
     /// <typeparam name="T">The host builder type.</typeparam>
     /// <param name="builder">The host builder.</param>
@@ -33,7 +34,9 @@ internal static class HostBuilderExtensions
             builder.UseSystemd();
             builder.ConfigureLogging((context, logging) =>
             {
-                logging.RemoveLoggingProvidersExcept(typeof(ConsoleLoggerProvider));
+                logging
+                    .RemoveLoggingProvidersExcept(typeof(ConsoleLoggerProvider))
+                    .SetMinimumLevel(LogLevel.Trace);
             });
         }
         else
@@ -67,34 +70,44 @@ internal static class HostBuilderExtensions
     /// <returns>
     /// The host builder for fluent API support.
     /// </returns>
-    public static T UseSerialPortServer<T>(this T builder)
+    public static T UseMainHostedService<T>(this T builder)
         where T : IHostBuilder
     {
         builder.ConfigureServices(services =>
         {
-            services.AddHostedService<ServiceHost>();
+            services
+                .AddHostedService<MainHostedService>()
+                .AddSingleton<ServiceSettings>()
+                .AddSingleton<BufferQueue<byte>>()
+                .AddSingleton<NetworkServer>()
+                .AddSingleton<NetworkDataReceiver>()
+                .AddSingleton<NetworkDataSender>()
+                .AddTransient<NetworkClient>();
         });
 
         return builder;
     }
 
+    [SupportedOSPlatform("windows")]
     private static T ConfigureEventLogLogging<T>(this T builder)
         where T : IHostBuilder
     {
+        // TODO: Need to register EventSource name in EventLog if it does not exist.
+        // This requires elevation. Unsure is windows service automatically adds. Will
+        // nee to test.
+
         builder.ConfigureLogging((context, logging) =>
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return;
-
-            logging.RemoveLoggingProvidersExcept(
-                typeof(EventLogLoggerProvider),
-                typeof(EventSourceLoggerProvider));
-
-            // TODO: Need to register EventSource name in EventLog if it does not exist.
-            // This requires elevation. Unsure is windows service automatically adds. Will
-            // nee to test.
-
-            //LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(logging.Services);
+            // TODO: This is not working too well.
+            logging
+                .ClearProviders()
+                .AddEventLog(config =>
+                {
+                    config.SourceName = ".NET Runtime"; //Constants.SerivceName,
+                    config.Filter = (s, e) => true;
+                    config.LogName = Constants.WindowsLogName;
+                })
+                .SetMinimumLevel(LogLevel.Trace);
         });
 
         return builder;

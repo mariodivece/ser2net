@@ -218,7 +218,7 @@ public sealed class BufferQueue<T> : IDisposable
     /// Dequeues all the available elements off the queue.
     /// </summary>
     /// <returns>The dequeued elements.</returns>
-    public T[] Dequeue() => Dequeue(Timeout.Infinite);
+    public T[] DequeueAll() => Dequeue(Timeout.Infinite);
 
     /// <summary>
     /// Attempts to retrieve an element, without removing it from the queue,

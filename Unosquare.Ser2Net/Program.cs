@@ -8,13 +8,7 @@ internal static class Program
         var builder = Host
             .CreateDefaultBuilder(args)
             .ConfigureLifetimeAndLogging()
-            .UseSerialPortServer()
-            .ConfigureServices((context, services) =>
-            {
-                services
-                    .AddSingleton<ServiceSettings>()
-                    .AddTransient<NetworkClient>();
-            });
+            .UseMainHostedService();
         
         using var host = builder.Build();
         
