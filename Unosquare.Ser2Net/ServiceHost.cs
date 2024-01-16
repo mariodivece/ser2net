@@ -1,52 +1,56 @@
 ﻿using System.Collections.Concurrent;
+using System.Net.Sockets;
 
 namespace Unosquare.Ser2Net;
 
 /// <summary>
-/// A serial port server.
+/// The main service host.
 /// </summary>
-internal sealed class SerialPortServer : BackgroundService
+internal sealed class ServiceHost : BackgroundService
 {
     private bool isDisposed;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SerialPortServer"/> class.
+    /// Initializes a new instance of the <see cref="ServiceHost"/> class.
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
     /// <param name="logger">The logger.</param>
     /// <param name="environment">The environment.</param>
-    public SerialPortServer(
-        ILogger<SerialPortServer> logger,
-        IConfiguration configuration,
-        IHostApplicationLifetime lifetime)
+    public ServiceHost(
+        ILogger<ServiceHost> logger,
+        ServiceSettings settings,
+        IHostApplicationLifetime lifetime,
+        IServiceProvider services)
         : base()
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(lifetime);
-        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(services);
 
         Logger = logger;
         Lifetime = lifetime;
-        Configuration = configuration;
+        Settings = settings;
+        Services = services;
     }
-
-    public IConfiguration Configuration { get; }
 
     /// <summary>
     /// Gets the lifetime.
     /// </summary>
-    public IHostApplicationLifetime Lifetime { get; }
+    private IHostApplicationLifetime Lifetime { get; }
+
+    private ServiceSettings Settings { get; }
+
+    private IServiceProvider Services { get; }
 
     /// <summary>
     /// Gets the logger.
     /// </summary>
-    public ILogger<SerialPortServer> Logger { get; }
+    private ILogger<ServiceHost> Logger { get; }
 
-    public TcpListener? TcpServer { get; private set; }
+    private TcpListener? TcpServer { get; set; }
 
-    public ServiceSettings Settings { get; } = new();
-
-    private List<SerialPortClient> Clients { get; } = [];
+    private List<NetworkClient> Clients { get; } = [];
 
     private void DisconnectClients()
     {
@@ -78,25 +82,23 @@ internal sealed class SerialPortServer : BackgroundService
     {
         try
         {
-            var serverAddress = ParseServerAddress();
-            var serverEndpoint = new IPEndPoint(serverAddress, Settings.ServerPort);
-            TcpServer = new TcpListener(serverEndpoint);
+            TcpServer = new TcpListener(Settings.ServerIP, Settings.ServerPort);
             TcpServer.Start();
 
-            Logger.LogInformation("Listening for TCP clients on {EndPoint}", serverEndpoint);
+            Logger.LogListenerStarted(TcpServer.LocalEndpoint);
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    var client = await SerialPortClient.WaitForClientAsync(this, cancellationToken).ConfigureAwait(false);
-                    Logger.LogInformation("Client {EndPoint} Connection accepted.", client.RemoteEndPoint);
+                    var socket = await TcpServer.AcceptSocketAsync(cancellationToken).ConfigureAwait(false);
+                    var client = ActivatorUtilities.CreateInstance<NetworkClient>(Services, socket);
+
+                    Logger.LogClientAccepted(client.RemoteEndPoint);
 
                     if (Clients.Count >= Constants.MaxClientCount)
                     {
-                        Logger.LogWarning("Client [{EndPoint}] rejected because connection count would exceed {MaxConnections}.",
-                            client.RemoteEndPoint, Constants.MaxClientCount);
-
+                        Logger.LogConnectionRejectedMax(client.RemoteEndPoint, Constants.MaxClientCount);
                         client.Dispose();
                         client = null;
                         continue;
@@ -104,9 +106,7 @@ internal sealed class SerialPortServer : BackgroundService
 
                     if (!client.IsConnected)
                     {
-                        Logger.LogWarning("Client [{EndPoint}] did not complete the connection",
-                            client.RemoteEndPoint);
-
+                        Logger.LogConnectionNotCompleted(client.RemoteEndPoint);
                         client.Dispose();
                         continue;
                     }
@@ -125,7 +125,7 @@ internal sealed class SerialPortServer : BackgroundService
         }
         finally
         {
-            Logger.LogInformation("TCP Listener [{EndPoint}] Shutting down . . . ", TcpServer?.LocalEndpoint);
+            Logger.LogListenerShuttingDown(TcpServer?.LocalEndpoint);
             TcpServer?.Stop();
             TcpServer?.Dispose();
             TcpServer = null;
@@ -137,7 +137,7 @@ internal sealed class SerialPortServer : BackgroundService
     {
         var byteQueue = new BufferQueue<byte>();
         var clientsSyncRoot = new SemaphoreSlim(1, 1);
-        var disconnectedClients = new ConcurrentQueue<SerialPortClient>();
+        var disconnectedClients = new ConcurrentQueue<NetworkClient>();
 
         async Task removeDisconnectedClients()
         {
@@ -162,7 +162,7 @@ internal sealed class SerialPortServer : BackgroundService
                 clientsSyncRoot.Release();
             }
         }
-        async Task<SerialPortClient[]> getCurrentClients()
+        async Task<NetworkClient[]> getCurrentClients()
         {
             try
             {
@@ -256,11 +256,10 @@ internal sealed class SerialPortServer : BackgroundService
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Logger.LogServiceStarting(nameof(SerialPortServer));
+        Logger.LogServiceStarting(nameof(ServiceHost));
 
         try
         {
-            ReadSettings();
             var tasks = new List<Task>
             {
                 ListenForNetworkClientsAsync(stoppingToken),
@@ -277,25 +276,5 @@ internal sealed class SerialPortServer : BackgroundService
         {
             Lifetime.StopApplication();
         }
-    }
-
-    private void ReadSettings()
-    {
-        Configuration.GetRequiredSection(ServiceSettings.SectionName).Bind(Settings);
-    }
-
-    private IPAddress ParseServerAddress()
-    {
-        if (!IPAddress.TryParse(Settings.ServerIP, out var serverIP))
-        {
-            Logger.LogWarning("Settings Server IP '{ServerIP}' is invalid. Will use all available local addresses.", Settings.ServerIP);
-            serverIP = Constants.DefaultServerIP;
-        }
-        else
-        {
-            Logger.LogInformation("Server IP: {ServerIP}", Settings.ServerIP);
-        }
-
-        return serverIP;
     }
 }

@@ -13,6 +13,7 @@
 		<!--
 		<PublishAot>true</PublishAot>
 		-->
+		<PublishAot>true</PublishAot>
 		
 	</PropertyGroup>
 

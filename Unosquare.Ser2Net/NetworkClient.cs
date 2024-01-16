@@ -1,6 +1,6 @@
 ﻿namespace Unosquare.Ser2Net;
 
-internal sealed class SerialPortClient : IDisposable
+internal sealed class NetworkClient : IDisposable
 {
     private readonly IMemoryOwner<byte> ReadBuffer;
     private readonly SemaphoreSlim AsyncRoot = new(1, 1);
@@ -8,14 +8,18 @@ internal sealed class SerialPortClient : IDisposable
     private bool _IsDisposed;
     private bool _IsConnected = true;
 
-    private SerialPortClient(SerialPortServer server, Socket socket)
+    public NetworkClient(ILogger<NetworkClient> logger, ServiceSettings settings, Socket socket)
     {
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(socket);
+        ArgumentNullException.ThrowIfNull(settings);
+
         NetSocket = socket;
-        Server = server;
-        Logger = server.Logger;
+        Settings = settings;
+        Logger = logger;
 
         // Configure the network client
-        BufferSize = Math.Max(4096, Server.Settings.BaudRate / 8);
+        BufferSize = Math.Max(4096, Settings.BaudRate / 8);
         ReadBuffer = MemoryPool<byte>.Shared.Rent(BufferSize);
         NetSocket.NoDelay = true;
         NetSocket.ReceiveBufferSize = BufferSize;
@@ -55,21 +59,11 @@ internal sealed class SerialPortClient : IDisposable
         }
     }
 
-    private SerialPortServer Server { get; set; }
+    private Socket NetSocket { get; }
 
-    private Socket NetSocket { get; set; }
+    private ILogger<NetworkClient> Logger { get; }
 
-    private ILogger<SerialPortServer> Logger { get; set; }
-
-    public static async Task<SerialPortClient> WaitForClientAsync(SerialPortServer server, CancellationToken token)
-    {
-        ArgumentNullException.ThrowIfNull(server);
-        if (server.TcpServer is null)
-            throw new InvalidOperationException($"{nameof(server)}.{nameof(server.TcpServer)} cannot be null.");
-
-        var socket = await server.TcpServer.AcceptSocketAsync(token).ConfigureAwait(false);
-        return new SerialPortClient(server, socket);
-    }
+    private ServiceSettings Settings { get; }
 
     public async ValueTask WriteAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
@@ -90,7 +84,7 @@ internal sealed class SerialPortClient : IDisposable
         catch (Exception ex)
         {
             hasErrors = true;
-            Logger.LogError("Client [{EndPoint}] Could not write to network stream.\r\n{ErrorMessage}", RemoteEndPoint, ex.Message);
+            Logger.LogErrorWriting(RemoteEndPoint, ex.Message);
             Dispose(alsoManaged: true);
             throw;
         }
@@ -103,12 +97,10 @@ internal sealed class SerialPortClient : IDisposable
 
     public async ValueTask<ReadOnlyMemory<byte>> ReadAsync(CancellationToken cancellationToken)
     {
-
         var hasErrors = false;
         try
         {
             await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
-
             var length = 0;
 
             if (!IsConnected)
@@ -130,7 +122,7 @@ internal sealed class SerialPortClient : IDisposable
         catch (Exception ex)
         {
             hasErrors = true;
-            Logger.LogError("Client [{EndPoint}] Could not read from network stream.\r\n{ErrorMessage}", RemoteEndPoint, ex.Message);
+            Logger.LogErrorReading(RemoteEndPoint, ex.Message);
             Dispose(alsoManaged: true);
             throw;
         }
@@ -159,7 +151,7 @@ internal sealed class SerialPortClient : IDisposable
             NetSocket.Close();
             ReadBuffer.Dispose();
             AsyncRoot.Dispose();
-            Logger.LogInformation("Client [{EndPoint}] Disconnected.", RemoteEndPoint);
+            Logger.LogClientDisconnected(RemoteEndPoint);
         }
     }
 

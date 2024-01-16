@@ -43,7 +43,8 @@ internal static class HostBuilderExtensions
             builder.ConfigureLogging((context, logging) =>
             {
                 var serilogLogger = new LoggerConfiguration()
-                    .ReadFrom.Configuration(context.Configuration)
+                    .WriteTo.Console()
+                    .MinimumLevel.Verbose()
                     .CreateLogger();
 
                 // Set a global static logger
@@ -71,7 +72,7 @@ internal static class HostBuilderExtensions
     {
         builder.ConfigureServices(services =>
         {
-            services.AddHostedService<SerialPortServer>();
+            services.AddHostedService<ServiceHost>();
         });
 
         return builder;
@@ -93,7 +94,7 @@ internal static class HostBuilderExtensions
             // This requires elevation. Unsure is windows service automatically adds. Will
             // nee to test.
 
-            LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(logging.Services);
+            //LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(logging.Services);
         });
 
         return builder;
