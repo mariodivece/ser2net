@@ -1,8 +1,4 @@
-﻿using System.Buffers;
-using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
+﻿using System.Collections.Concurrent;
 
 namespace Unosquare.Ser2Net;
 
@@ -224,7 +220,13 @@ internal sealed class SerialPortServer : BackgroundService
                 {
                     try
                     {
+                        await client.WriteAsync(
+                            Encoding.UTF8.GetBytes("\r\nReceived 20 bytes. Will spit them out and wait for more.\r\n"), cancellation)
+                        .ConfigureAwait(false);
                         await client.WriteAsync(echoBytes, cancellation).ConfigureAwait(false);
+                        await client.WriteAsync(
+                            Encoding.UTF8.GetBytes($"\r\n\tQ: Capacity = {byteQueue.Capacity}, Count = {byteQueue.Count}\r\n\r\n"), cancellation)
+                        .ConfigureAwait(false);
                     }
                     catch
                     {
@@ -239,10 +241,16 @@ internal sealed class SerialPortServer : BackgroundService
             }
         });
 
-        await Task.WhenAll(readTask, writeTask).ConfigureAwait(false);
-        byteQueue.Dispose();
-        clientsSyncRoot.Dispose();
-        DisconnectClients();
+        try
+        {
+            await Task.WhenAll(readTask, writeTask).ConfigureAwait(false);
+        }
+        finally
+        {
+            byteQueue.Dispose();
+            clientsSyncRoot.Dispose();
+            DisconnectClients();
+        }
     }
 
     /// <inheritdoc/>

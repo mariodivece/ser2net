@@ -20,6 +20,7 @@ public sealed class BufferQueue<T> : IDisposable
     private readonly int CapacityGrowth;
     private readonly object SyncLock = new();
 
+    private bool m_IsDisposed;
     private int m_Count;
     private int ReadHead;
     private int WriteTail;
@@ -45,6 +46,18 @@ public sealed class BufferQueue<T> : IDisposable
         CapacityGrowth = InitialCapacity - 1;
         Buffer = MemoryPool<T>.Shared.Rent(initialCapacity);
         BufferHandle = Buffer.Memory.Pin();
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether this instance has been disposed.
+    /// </summary>
+    public bool IsDisposed
+    {
+        get
+        {
+            lock (SyncLock)
+                return m_IsDisposed;
+        }
     }
 
     /// <summary>
@@ -262,6 +275,9 @@ public sealed class BufferQueue<T> : IDisposable
     {
         lock (SyncLock)
         {
+            if (m_IsDisposed) return;
+
+            m_IsDisposed = true;
             BufferHandle.Dispose();
             Buffer.Dispose();
         }
