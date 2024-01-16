@@ -2,45 +2,47 @@
 
 internal sealed class SerialPortClient : IDisposable
 {
-    private bool isDisposed;
-    private readonly IMemoryOwner<byte> readBuffer;
-    private bool _IsConnected = true;
+    private readonly IMemoryOwner<byte> ReadBuffer;
     private readonly SemaphoreSlim AsyncRoot = new(1, 1);
 
-    private SerialPortClient(SerialPortServer server, TcpClient client)
+    private bool _IsDisposed;
+    private bool _IsConnected = true;
+
+    private SerialPortClient(SerialPortServer server, Socket socket)
     {
-        NetworkClient = client;
+        NetSocket = socket;
         Server = server;
         Logger = server.Logger;
 
         // Configure the network client
-        var bufferSize = Math.Max(4096, Server.Settings.BaudRate / 8);
-        NetworkClient.NoDelay = true;
-        NetworkClient.ReceiveBufferSize = bufferSize;
-        NetworkClient.SendBufferSize = bufferSize;
-        NetworkClient.Client.Blocking = false;
-        readBuffer = MemoryPool<byte>.Shared.Rent(bufferSize);
-        RemoteEndPoint = NetworkClient.Client.RemoteEndPoint ?? Constants.EmptyEndPoint;
+        BufferSize = Math.Max(4096, Server.Settings.BaudRate / 8);
+        ReadBuffer = MemoryPool<byte>.Shared.Rent(BufferSize);
+        NetSocket.NoDelay = true;
+        NetSocket.ReceiveBufferSize = BufferSize;
+        NetSocket.SendBufferSize = BufferSize;
+        NetSocket.Blocking = false;
+        RemoteEndPoint = NetSocket.RemoteEndPoint ?? Constants.EmptyEndPoint;
     }
 
     public EndPoint RemoteEndPoint { get; }
+
+    public int BufferSize { get; }
 
     public bool IsConnected
     {
         get
         {
             var isConnectedState = _IsConnected
-                && !isDisposed
-                && NetworkClient.Connected
-                && NetworkClient.Client.Connected;
+                && !_IsDisposed
+                && NetSocket.Connected;
 
             if (!isConnectedState)
                 return false;
 
             try
             {
-                var isDisconnected = NetworkClient.Client.Poll(1000, SelectMode.SelectRead)
-                    && NetworkClient.Client.Available <= 0;
+                var isDisconnected = NetSocket.Poll(1000, SelectMode.SelectRead)
+                    && NetSocket.Available <= 0;
 
                 _IsConnected = !isDisconnected;
             }
@@ -55,7 +57,7 @@ internal sealed class SerialPortClient : IDisposable
 
     private SerialPortServer Server { get; set; }
 
-    private TcpClient NetworkClient { get; set; }
+    private Socket NetSocket { get; set; }
 
     private ILogger<SerialPortServer> Logger { get; set; }
 
@@ -65,8 +67,8 @@ internal sealed class SerialPortClient : IDisposable
         if (server.TcpServer is null)
             throw new InvalidOperationException($"{nameof(server)}.{nameof(server.TcpServer)} cannot be null.");
 
-        var client = await server.TcpServer.AcceptTcpClientAsync(token).ConfigureAwait(false);
-        return new SerialPortClient(server, client);
+        var socket = await server.TcpServer.AcceptSocketAsync(token).ConfigureAwait(false);
+        return new SerialPortClient(server, socket);
     }
 
     public async ValueTask WriteAsync(Memory<byte> buffer, CancellationToken cancellationToken)
@@ -83,7 +85,7 @@ internal sealed class SerialPortClient : IDisposable
             if (!IsConnected)
                 throw new SocketException((int)SocketError.NotConnected);
 
-            await NetworkClient.Client.SendAsync(buffer, cancellationToken).ConfigureAwait(false);
+            await NetSocket.SendAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -112,18 +114,18 @@ internal sealed class SerialPortClient : IDisposable
             if (!IsConnected)
                 throw new SocketException((int)SocketError.NotConnected);
 
-            while (NetworkClient.Available > 0 && !cancellationToken.IsCancellationRequested)
+            while (NetSocket.Available > 0 && !cancellationToken.IsCancellationRequested)
             {
-                var bytesRead = await NetworkClient.Client.ReceiveAsync(readBuffer.Memory[length..], cancellationToken);
+                var bytesRead = await NetSocket.ReceiveAsync(ReadBuffer.Memory[length..], cancellationToken);
                 length += bytesRead;
 
-                if (bytesRead <= 0 || length >= readBuffer.Memory.Length)
+                if (bytesRead <= 0 || length >= ReadBuffer.Memory.Length)
                     break;
             }
 
             return length == 0
                 ? ReadOnlyMemory<byte>.Empty
-                : readBuffer.Memory[..length];
+                : ReadBuffer.Memory[..length];
         }
         catch (Exception ex)
         {
@@ -147,15 +149,15 @@ internal sealed class SerialPortClient : IDisposable
 
     private void Dispose(bool alsoManaged)
     {
-        if (isDisposed) return;
+        if (_IsDisposed) return;
         _IsConnected = false;
-        isDisposed = true;
+        _IsDisposed = true;
 
         if (alsoManaged)
         {
             _IsConnected = false;
-            NetworkClient.Close();
-            readBuffer.Dispose();
+            NetSocket.Close();
+            ReadBuffer.Dispose();
             AsyncRoot.Dispose();
             Logger.LogInformation("Client [{EndPoint}] Disconnected.", RemoteEndPoint);
         }

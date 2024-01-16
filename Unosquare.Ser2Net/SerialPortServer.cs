@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -132,67 +133,115 @@ internal sealed class SerialPortServer : BackgroundService
             TcpServer?.Stop();
             TcpServer?.Dispose();
             TcpServer = null;
-            
+
         }
     }
 
     public async Task RunEchoServer(CancellationToken cancellation)
     {
-        var builder = new StringBuilder();
+        var byteQueue = new BufferQueue<byte>();
+        var clientsSyncRoot = new SemaphoreSlim(1, 1);
+        var disconnectedClients = new ConcurrentQueue<SerialPortClient>();
 
-        while (!cancellation.IsCancellationRequested)
+        async Task removeDisconnectedClients()
         {
-            if (Clients.Count <= 0)
+            try
             {
-                await Task.Delay(1).ConfigureAwait(false);
-                continue;
-            }
+                await clientsSyncRoot.WaitAsync(cancellation).ConfigureAwait(false);
 
-            var disconnectedClients = new List<SerialPortClient>(Clients.Count);
-            var readSomething = false;
+                if (disconnectedClients.IsEmpty)
+                    return;
 
-            foreach (var client in Clients)
-            {
-                try
+                while (!disconnectedClients.IsEmpty)
                 {
-                    var readBuffer = await client.ReadAsync(cancellation).ConfigureAwait(false);
-                    if (readBuffer.Length > 0)
-                        builder.Append(Encoding.UTF8.GetString(readBuffer.Span));
-                }
-                catch
-                {
-                    disconnectedClients.Add(client);
+                    if (!disconnectedClients.TryDequeue(out var client) || client is null)
+                        continue;
+
+                    client.Dispose();
+                    Clients.Remove(client);
                 }
             }
-
-            if (builder.Length > 0)
+            finally
             {
-                readSomething = true;
-                foreach (var client in Clients.Except(disconnectedClients))
+                clientsSyncRoot.Release();
+            }
+        }
+        async Task<SerialPortClient[]> getCurrentClients()
+        {
+            try
+            {
+                await clientsSyncRoot.WaitAsync(cancellation).ConfigureAwait(false);
+                return [.. Clients];
+            }
+            finally
+            {
+                clientsSyncRoot.Release();
+            }
+        }
+
+        var readTask = Task.Run(async () =>
+        {
+            while (!cancellation.IsCancellationRequested)
+            {
+                var currentClients = await getCurrentClients().ConfigureAwait(false);
+                if (currentClients.Length <= 0)
+                {
+                    await Task.Delay(1, cancellation).ConfigureAwait(false);
+                    continue;
+                }
+
+                foreach (var client in currentClients)
                 {
                     try
                     {
-                        await client.WriteAsync(Encoding.UTF8.GetBytes(builder.ToString()), cancellation).ConfigureAwait(false);
+                        var readBuffer = await client.ReadAsync(cancellation).ConfigureAwait(false);
+                        byteQueue.Enqueue(readBuffer.Span);
                     }
                     catch
                     {
-                        disconnectedClients.Add(client);
+                        disconnectedClients.Enqueue(client);
                     }
                 }
 
-                builder.Clear();
+                await removeDisconnectedClients().ConfigureAwait(false);
             }
+        });
 
-            foreach (var disconnectedClient in disconnectedClients)
+        var writeTask = Task.Run(async () =>
+        {
+            while (!cancellation.IsCancellationRequested)
             {
-                Clients.Remove(disconnectedClient);
-                disconnectedClient.Dispose();
+                if (byteQueue.Count < 20)
+                {
+                    await Task.Delay(1, cancellation).ConfigureAwait(false);
+                    continue;
+                }
+
+                var echoBytes = byteQueue.Dequeue();
+
+                var currentClients = await getCurrentClients().ConfigureAwait(false);
+                foreach (var client in currentClients)
+                {
+                    try
+                    {
+                        await client.WriteAsync(echoBytes, cancellation).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        disconnectedClients.Enqueue(client);
+                    }
+                }
+
+                await removeDisconnectedClients().ConfigureAwait(false);
+
+                if (currentClients.Length <= 0)
+                    await Task.Delay(1, cancellation).ConfigureAwait(false);
             }
+        });
 
-            if (!readSomething)
-                await Task.Delay(1).ConfigureAwait(false);
-        }
-
+        await Task.WhenAll(readTask, writeTask).ConfigureAwait(false);
+        byteQueue.Dispose();
+        clientsSyncRoot.Dispose();
         DisconnectClients();
     }
 
