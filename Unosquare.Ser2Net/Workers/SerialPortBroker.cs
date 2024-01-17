@@ -9,9 +9,9 @@ namespace Unosquare.Ser2Net.Workers;
 /// <summary>
 /// 
 /// </summary>
-internal class PortBroker : BufferWorkerBase<PortBroker>
+internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
 {
-    public PortBroker(ILogger<PortBroker> logger, ServiceSettings settings, DataBridge dataBridge)
+    public SerialPortBroker(ILogger<SerialPortBroker> logger, ServiceSettings settings, DataBridge dataBridge)
         : base(logger, settings, dataBridge)
     {
         // placeholder
@@ -73,9 +73,6 @@ internal class PortBroker : BufferWorkerBase<PortBroker>
                 serialPort = null;
                 // TODO: log
             }
-
-
-
         }
 
         // TODO: check if port is in use

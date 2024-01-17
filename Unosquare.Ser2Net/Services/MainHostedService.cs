@@ -18,7 +18,7 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
         NetServer networkServer,
         NetDataSender networkDataSender,
         NetDataReceiver networkDataReceiver,
-        PortBroker portBroker)
+        SerialPortBroker portBroker)
         : base(logger, settings)
     {
         ArgumentNullException.ThrowIfNull(lifetime);
@@ -45,7 +45,7 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
 
     private NetDataReceiver NetworkDataReceiver { get; }
 
-    private PortBroker PortBroker { get; }
+    private SerialPortBroker PortBroker { get; }
 
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

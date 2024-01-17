@@ -82,7 +82,7 @@ internal static class BuilderExtensions
                 .AddSingleton<NetServer>()
                 .AddSingleton<NetDataReceiver>()
                 .AddSingleton<NetDataSender>()
-                .AddSingleton<PortBroker>()
+                .AddSingleton<SerialPortBroker>()
                 .AddTransient<NetworkClient>();
         });
 
