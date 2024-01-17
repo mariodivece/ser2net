@@ -1,4 +1,4 @@
-﻿namespace Unosquare.Ser2Net.Services;
+﻿namespace Unosquare.Ser2Net.Memory;
 
 /// <summary>
 /// Defines a class that represents a generic resizable circular queue.
@@ -9,7 +9,7 @@
 /// <see cref="Span{T}"/> types as opposed to individual elements.
 /// </summary>
 /// <remarks>This class is thread-safe.</remarks>
-public sealed class BufferQueue<T> : IDisposable
+public sealed class MemoryQueue<T> : IDisposable
     where T : unmanaged
 {
     private const int DefaultInitialCapacity = 2048;
@@ -26,19 +26,19 @@ public sealed class BufferQueue<T> : IDisposable
     private MemoryHandle BufferHandle;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="BufferQueue{T}"/> class.
+    /// Initializes a new instance of the <see cref="MemoryQueue{T}"/> class.
     /// </summary>
-    public BufferQueue()
+    public MemoryQueue()
         : this(DefaultInitialCapacity)
     {
         // placeholder
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="BufferQueue{T}"/> class.
+    /// Initializes a new instance of the <see cref="MemoryQueue{T}"/> class.
     /// </summary>
     /// <param name="initialCapacity">The initial capacity of the internal element buffer.</param>
-    public BufferQueue(int initialCapacity)
+    public MemoryQueue(int initialCapacity)
     {
         InitialCapacity = initialCapacity > 0 ? initialCapacity : DefaultInitialCapacity;
         CapacityGrowth = InitialCapacity - 1;

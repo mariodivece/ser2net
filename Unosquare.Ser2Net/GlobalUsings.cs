@@ -9,3 +9,4 @@ global using System.Diagnostics.CodeAnalysis;
 global using System.Globalization;
 global using Unosquare.Ser2Net.Services;
 global using Unosquare.Ser2Net.Workers;
+global using Unosquare.Ser2Net.Memory;
