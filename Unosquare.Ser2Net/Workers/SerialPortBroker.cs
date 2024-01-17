@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Unosquare.Ser2Net.Workers;
+﻿namespace Unosquare.Ser2Net.Workers;
 
 /// <summary>
-/// 
+/// Maintains a serial port connection and acts as a proxy to such serial port.
 /// </summary>
 internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
 {
