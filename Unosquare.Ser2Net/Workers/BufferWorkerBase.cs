@@ -3,13 +3,12 @@
 internal abstract class BufferWorkerBase<T> : WorkerBase<T>
     where T : BackgroundService
 {
-    public BufferWorkerBase(ILogger<T> logger, ServiceSettings settings, BufferQueue<byte> bufferQueue)
+    public BufferWorkerBase(ILogger<T> logger, ServiceSettings settings, DataBridge dataBridge)
         : base(logger, settings)
     {
-        ArgumentNullException.ThrowIfNull(bufferQueue);
-
-        BufferQueue = bufferQueue;
+        ArgumentNullException.ThrowIfNull(dataBridge);
+        DataBridge = dataBridge;
     }
 
-    protected BufferQueue<byte> BufferQueue { get; }
+    protected DataBridge DataBridge { get; }
 }

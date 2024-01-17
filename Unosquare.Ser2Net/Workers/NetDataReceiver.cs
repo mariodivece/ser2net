@@ -1,9 +1,12 @@
 ﻿namespace Unosquare.Ser2Net.Workers;
 
+/// <summary>
+/// Reads data from a TCP client and sends it to the <see cref="DataBridge.ToPortBuffer"/>.
+/// </summary>
 internal class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
 {
-    public NetDataReceiver(ILogger<NetDataReceiver> logger, ServiceSettings settings, BufferQueue<byte> bufferQueue, NetServer server)
-        : base(logger, settings, bufferQueue)
+    public NetDataReceiver(ILogger<NetDataReceiver> logger, ServiceSettings settings, DataBridge dataBridge, NetServer server)
+        : base(logger, settings, dataBridge)
     {
         ArgumentNullException.ThrowIfNull(server);
         Server = server;
@@ -27,7 +30,7 @@ internal class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
                 try
                 {
                     var readBuffer = await client.ReadAsync(stoppingToken).ConfigureAwait(false);
-                    BufferQueue.Enqueue(readBuffer.Span);
+                    DataBridge.ToPortBuffer.Enqueue(readBuffer.Span);
                 }
                 catch
                 {

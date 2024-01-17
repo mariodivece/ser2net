@@ -78,10 +78,11 @@ internal static class BuilderExtensions
             services
                 .AddHostedService<MainHostedService>()
                 .AddSingleton<ServiceSettings>()
-                .AddSingleton<BufferQueue<byte>>()
+                .AddSingleton<DataBridge>()
                 .AddSingleton<NetServer>()
                 .AddSingleton<NetDataReceiver>()
                 .AddSingleton<NetDataSender>()
+                .AddSingleton<PortBroker>()
                 .AddTransient<NetworkClient>();
         });
 

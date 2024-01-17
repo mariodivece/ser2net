@@ -1,9 +1,12 @@
 ﻿namespace Unosquare.Ser2Net.Workers;
 
+/// <summary>
+/// Reads data from <see cref="DataBridge.ToNetBuffer"/> client and sends it to the TCP client.
+/// </summary>
 internal class NetDataSender : BufferWorkerBase<NetDataSender>
 {
-    public NetDataSender(ILogger<NetDataSender> logger, ServiceSettings settings, BufferQueue<byte> bufferQueue, NetServer server)
-        : base(logger, settings, bufferQueue)
+    public NetDataSender(ILogger<NetDataSender> logger, ServiceSettings settings, DataBridge dataBridge, NetServer server)
+        : base(logger, settings, dataBridge)
     {
         ArgumentNullException.ThrowIfNull(server);
 
@@ -17,26 +20,19 @@ internal class NetDataSender : BufferWorkerBase<NetDataSender>
         while (!stoppingToken.IsCancellationRequested)
         {
             var currentClients = Server.Clients;
+            var echoBytes = DataBridge.ToNetBuffer.DequeueAll();
 
-            if (BufferQueue.Count < 20 || currentClients.Count <= 0)
+            if (currentClients.Count <= 0 || echoBytes.Length <= 0)
             {
                 await Task.Delay(1, stoppingToken).ConfigureAwait(false);
                 continue;
             }
 
-            var echoBytes = BufferQueue.DequeueAll();
-
             foreach (var client in currentClients)
             {
                 try
                 {
-                    await client.WriteAsync(
-                        Encoding.UTF8.GetBytes("\r\nReceived 20 bytes. Will spit them out and wait for more.\r\n"), stoppingToken)
-                    .ConfigureAwait(false);
                     await client.WriteAsync(echoBytes, stoppingToken).ConfigureAwait(false);
-                    await client.WriteAsync(
-                        Encoding.UTF8.GetBytes($"\r\n\tQ: Capacity = {BufferQueue.Capacity}, Count = {BufferQueue.Count}\r\n\r\n"), stoppingToken)
-                    .ConfigureAwait(false);
                 }
                 catch
                 {

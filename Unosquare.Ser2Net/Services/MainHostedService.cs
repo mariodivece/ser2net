@@ -17,18 +17,21 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
         IHostApplicationLifetime lifetime,
         NetServer networkServer,
         NetDataSender networkDataSender,
-        NetDataReceiver networkDataReceiver)
+        NetDataReceiver networkDataReceiver,
+        PortBroker portBroker)
         : base(logger, settings)
     {
         ArgumentNullException.ThrowIfNull(lifetime);
         ArgumentNullException.ThrowIfNull(networkServer);
         ArgumentNullException.ThrowIfNull(networkDataSender);
         ArgumentNullException.ThrowIfNull(networkDataReceiver);
+        ArgumentNullException.ThrowIfNull(portBroker);
 
         Lifetime = lifetime;
         NetworkServer = networkServer;
         NetworkDataSender = networkDataSender;
         NetworkDataReceiver = networkDataReceiver;
+        PortBroker = portBroker;
     }
 
     /// <summary>
@@ -42,6 +45,8 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
 
     private NetDataReceiver NetworkDataReceiver { get; }
 
+    private PortBroker PortBroker { get; }
+
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -54,7 +59,8 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
             await RunBackgroundServicesAsync(stoppingToken,
                 NetworkServer,
                 NetworkDataReceiver,
-                NetworkDataSender);
+                NetworkDataSender,
+                PortBroker);
         }
         catch (TaskCanceledException)
         {
