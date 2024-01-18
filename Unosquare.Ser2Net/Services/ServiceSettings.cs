@@ -8,11 +8,6 @@ internal class ServiceSettings
     {
         Logger = logger;
 
-        if (TryRead<string>(configuration, nameof(Message), out var message))
-            Message = message;
-        else
-            Logger.LogDefaultSetting(LoggerName, nameof(Message), Message);
-
         if (TryRead<IPAddress>(configuration, nameof(ServerIP), out var serverIP))
             ServerIP = serverIP;
         else
@@ -50,8 +45,6 @@ internal class ServiceSettings
     }
 
     private ILogger<ServiceSettings> Logger { get; }
-
-    public string Message { get; set; } = string.Empty;
 
     public IPAddress ServerIP { get; set; } = IPAddress.Any;
 

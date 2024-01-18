@@ -1,0 +1,1 @@
+sc create unoser2net binPath="C:\Users\Administrator\Desktop\unoser2net\unoser2net.exe" DisplayName="Unosquare Ser2Net Service" start=auto

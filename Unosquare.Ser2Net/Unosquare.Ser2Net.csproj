@@ -6,6 +6,7 @@
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
 		<OutputType>exe</OutputType>
+		<AssemblyName>unoser2net</AssemblyName>
 		<PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 		<PlatformTarget>x64</PlatformTarget>
