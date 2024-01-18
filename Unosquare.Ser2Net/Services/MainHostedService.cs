@@ -5,6 +5,8 @@
 /// </summary>
 internal sealed class MainHostedService : WorkerBase<MainHostedService>
 {
+    private const string LoggerName = "Service";
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MainHostedService"/> class.
     /// </summary>
@@ -48,7 +50,7 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Logger.LogServiceStarting(nameof(MainHostedService));
+        Logger.LogServiceStarting(LoggerName);
 
         try
         {
@@ -66,6 +68,7 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
         }
         catch (Exception ex)
         {
+            Logger.LogServiceError(LoggerName, ex);
             Environment.ExitCode = Constants.ExitCodeFailure;
         }
         finally

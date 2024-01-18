@@ -18,7 +18,7 @@ internal unsafe sealed class MemoryBlock<T> : IDisposable
     public MemoryBlock(int length)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, 0);
-        MemoryManager = new NativeMemoryManager(length);    
+        MemoryManager = new NativeMemoryManager(length);
     }
 
     /// <summary>

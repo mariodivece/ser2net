@@ -7,7 +7,8 @@
 /// </summary>
 internal sealed class NetworkClient : IDisposable
 {
-    private const int DefaultReadBufferSize = 8192;
+    const string LoggerName = "TCP";
+
     private readonly MemoryBlock<byte> ReadBuffer;
     private long _IsDisposed;
     private bool _IsConnected = true;
@@ -24,7 +25,7 @@ internal sealed class NetworkClient : IDisposable
         Logger = logger;
 
         // Configure the network client
-        BufferSize = Math.Max(DefaultReadBufferSize, Settings.BaudRate / 8);
+        BufferSize = Math.Max(Constants.DefaultBlockSize, Settings.BaudRate / 8);
         ReadBuffer = new(BufferSize);
         NetSocket.ReceiveBufferSize = BufferSize;
         NetSocket.SendBufferSize = BufferSize;
@@ -99,7 +100,7 @@ internal sealed class NetworkClient : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogErrorWriting(RemoteEndPoint, ex.Message);
+            Logger.LogErrorWriting(LoggerName, RemoteEndPoint, ex.Message);
             Dispose();
             throw;
         }
@@ -137,7 +138,7 @@ internal sealed class NetworkClient : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogErrorReading(RemoteEndPoint, ex.Message);
+            Logger.LogErrorReading(LoggerName, RemoteEndPoint, ex.Message);
             Dispose();
             throw;
         }
@@ -163,7 +164,6 @@ internal sealed class NetworkClient : IDisposable
         NetSocket.Close();
         ReadBuffer.Dispose();
         AsyncRoot.Dispose();
-        Logger.LogClientDisconnected(RemoteEndPoint);
+        Logger.LogClientDisconnected(LoggerName, RemoteEndPoint);
     }
-
 }

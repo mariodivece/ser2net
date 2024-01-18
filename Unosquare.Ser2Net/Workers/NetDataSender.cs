@@ -1,7 +1,7 @@
 ﻿namespace Unosquare.Ser2Net.Workers;
 
 /// <summary>
-/// Reads data from <see cref="DataBridge.ToNetBuffer"/> client and sends it to the TCP client.
+/// Reads data from <see cref="DataBridge.ToNetBuffer"/> client and sends it to the TCP connected clients.
 /// </summary>
 internal class NetDataSender : BufferWorkerBase<NetDataSender>
 {
@@ -24,7 +24,9 @@ internal class NetDataSender : BufferWorkerBase<NetDataSender>
 
             if (currentClients.Count <= 0 || echoBytes.Length <= 0)
             {
-                await Task.Delay(1, stoppingToken).ConfigureAwait(false);
+                // prevent exceptions on task delays
+                try { await Task.Delay(1, stoppingToken).ConfigureAwait(false); }
+                catch { }
                 continue;
             }
 

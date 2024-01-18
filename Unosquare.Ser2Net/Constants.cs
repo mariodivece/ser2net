@@ -25,4 +25,6 @@ internal static class Constants
     public static readonly EndPoint EmptyEndPoint = new IPEndPoint(IPAddress.Any, 0);
 
     public const int MaxClientCount = 1;
+
+    public const int DefaultBlockSize = 4096;
 }

@@ -1,7 +1,7 @@
 ﻿namespace Unosquare.Ser2Net.Workers;
 
 /// <summary>
-/// Reads data from a TCP client and sends it to the <see cref="DataBridge.ToPortBuffer"/>.
+/// Reads data from all connected TCP clients and sends it to the <see cref="DataBridge.ToPortBuffer"/>.
 /// </summary>
 internal class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
 {
@@ -21,7 +21,9 @@ internal class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
             var currentClients = Server.Clients;
             if (currentClients.Count <= 0)
             {
-                await Task.Delay(1, stoppingToken).ConfigureAwait(false);
+                // prevent exceptions on task delays
+                try { await Task.Delay(1, stoppingToken).ConfigureAwait(false); }
+                catch { }
                 continue;
             }
 

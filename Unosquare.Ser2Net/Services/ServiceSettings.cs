@@ -2,6 +2,8 @@
 
 internal class ServiceSettings
 {
+    private const string LoggerName = "Settings";
+
     public ServiceSettings(IConfiguration configuration, ILogger<ServiceSettings> logger)
     {
         Logger = logger;
@@ -9,42 +11,42 @@ internal class ServiceSettings
         if (TryRead<string>(configuration, nameof(Message), out var message))
             Message = message;
         else
-            Logger.LogDefaultSetting(nameof(Message), Message);
+            Logger.LogDefaultSetting(LoggerName, nameof(Message), Message);
 
         if (TryRead<IPAddress>(configuration, nameof(ServerIP), out var serverIP))
             ServerIP = serverIP;
         else
-            Logger.LogDefaultSetting(nameof(ServerIP), ServerIP.ToString());
+            Logger.LogDefaultSetting(LoggerName, nameof(ServerIP), ServerIP.ToString());
 
         if (TryRead<int>(configuration, nameof(ServerPort), out var serverPort))
             ServerPort = serverPort;
         else
-            Logger.LogDefaultSetting(nameof(ServerPort), ServerPort.ToString(CultureInfo.InvariantCulture));
+            Logger.LogDefaultSetting(LoggerName, nameof(ServerPort), ServerPort.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<string>(configuration, nameof(PortName), out var portName))
             PortName = portName;
         else
-            Logger.LogDefaultSetting(nameof(PortName), PortName);
+            Logger.LogDefaultSetting(LoggerName, nameof(PortName), PortName);
 
         if (TryRead<int>(configuration, nameof(BaudRate), out var baudRate))
             BaudRate = baudRate;
         else
-            Logger.LogDefaultSetting(nameof(BaudRate), BaudRate.ToString(CultureInfo.InvariantCulture));
+            Logger.LogDefaultSetting(LoggerName, nameof(BaudRate), BaudRate.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<int>(configuration, nameof(DataBits), out var dataBits))
             DataBits = dataBits;
         else
-            Logger.LogDefaultSetting(nameof(DataBits), DataBits.ToString(CultureInfo.InvariantCulture));
+            Logger.LogDefaultSetting(LoggerName, nameof(DataBits), DataBits.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<StopBits>(configuration, nameof(StopBits), out var stopBits))
             StopBits = stopBits;
         else
-            Logger.LogDefaultSetting(nameof(StopBits), StopBits.ToString());
+            Logger.LogDefaultSetting(LoggerName, nameof(StopBits), StopBits.ToString());
 
         if (TryRead<Parity>(configuration, nameof(Parity), out var parity))
             Parity = parity;
         else
-            Logger.LogDefaultSetting(nameof(Parity), Parity.ToString());
+            Logger.LogDefaultSetting(LoggerName, nameof(Parity), Parity.ToString());
     }
 
     private ILogger<ServiceSettings> Logger { get; }

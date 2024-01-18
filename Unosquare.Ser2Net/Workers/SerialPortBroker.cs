@@ -3,89 +3,100 @@
 /// <summary>
 /// Maintains a serial port connection and acts as a proxy to such serial port.
 /// </summary>
-internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
+internal class SerialPortBroker(ILogger<SerialPortBroker> logger, ServiceSettings settings, DataBridge dataBridge) :
+    BufferWorkerBase<SerialPortBroker>(logger, settings, dataBridge)
 {
-    public SerialPortBroker(ILogger<SerialPortBroker> logger, ServiceSettings settings, DataBridge dataBridge)
-        : base(logger, settings, dataBridge)
-    {
-        // placeholder
-    }
+    const string LoggerName = "Serial";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var readBuffer = new MemoryBlock<byte>(4096);
-        using var writeBuffer = new MemoryBlock<byte>(4096);
-
+        using var readBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
+        using var writeBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
         SerialPort? serialPort = null;
-
         var performDelay = false;
-        while (!stoppingToken.IsCancellationRequested)
+
+        try
         {
-            // always dequeue regardless of connection state
-            var pendingWriteCount = DataBridge.ToPortBuffer.Dequeue(writeBuffer.Span);
-
-            if (performDelay)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await Task.Delay(500, stoppingToken).ConfigureAwait(false);
-                performDelay = false;
-                continue;
-            }
+                // always dequeue regardless of connection state
+                var pendingWriteCount = DataBridge.ToPortBuffer.Dequeue(writeBuffer.Span);
 
-            if (serialPort is null)
-            {
-                if (performDelay = !TryConnectSerialPort(out serialPort))
+                if (performDelay)
+                {
+                    await Task.Delay(500, stoppingToken).ConfigureAwait(false);
+                    performDelay = false;
                     continue;
+                }
 
                 if (serialPort is null)
-                    continue;
-            }
-
-            try
-            {
-                // receive data from serial port
-                if (serialPort.BytesToRead > 0)
                 {
-                    var bytesRead = await serialPort.BaseStream
-                        .ReadAsync(readBuffer.Memory, stoppingToken)
-                        .ConfigureAwait(false);
+                    if (performDelay = !TryConnectWantedPort(out serialPort))
+                        continue;
 
-                    if (bytesRead > 0)
-                        DataBridge.ToNetBuffer.Enqueue(readBuffer[..bytesRead]);
-
+                    if (serialPort is null)
+                        continue;
                 }
 
-                // send data to serial port
-                if (pendingWriteCount > 0)
+                try
                 {
-                    await serialPort.BaseStream
-                        .WriteAsync(writeBuffer.Memory[..pendingWriteCount], stoppingToken)
-                        .ConfigureAwait(false);
-                }
+                    // fire up the receive task
+                    var receiveTask = ReceiveSerialPortDataAsync(serialPort, readBuffer.Memory, stoppingToken);
 
-                if (serialPort is not null && serialPort.BytesToRead <= 0 && DataBridge.ToPortBuffer.Count <= 0)
-                    await Task.Delay(1, stoppingToken).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogInformation("Serial Port {PortName} Disconnected.", serialPort.PortName);
-                serialPort.Close();
-                serialPort.Dispose();
-                serialPort = null;
-                
+                    // send data to serial port
+                    if (pendingWriteCount > 0)
+                    {
+                        await serialPort.BaseStream
+                            .WriteAsync(writeBuffer.Memory[..pendingWriteCount], stoppingToken)
+                            .ConfigureAwait(false);
+                    }
+
+                    // wait for the receive task to complete also
+                    await receiveTask.ConfigureAwait(false);
+
+                    // give the task a break if there's nothing to do at this point
+                    if (serialPort is not null && serialPort.BytesToRead <= 0 && DataBridge.ToPortBuffer.Count <= 0)
+                        await Task.Delay(1, stoppingToken).ConfigureAwait(false);
+                }
+                catch
+                {
+                    Logger.LogPortDisconnected(LoggerName, serialPort.PortName);
+                    serialPort.Close();
+                    serialPort.Dispose();
+                    serialPort = null;
+                }
             }
         }
-
-        serialPort?.Dispose();
-        Logger.LogInformation("Serial Port Broker Exited");
-
-        // TODO: check if port is in use
-        // https://stackoverflow.com/questions/195483/c-sharp-check-if-a-com-serial-port-is-already-open
-        //throw new NotImplementedException();
-        //readBuffer.Dispose();
-        //writeBuffer.Dispose();
+        catch
+        {
+            // ignore
+        }
+        finally
+        {
+            serialPort?.Dispose();
+            Logger.LogBrokerStopped(LoggerName);
+        }
     }
 
-    private bool TryConnectSerialPort([MaybeNullWhen(false)] out SerialPort serialPort)
+    private async ValueTask ReceiveSerialPortDataAsync(
+        SerialPort? currentPort, Memory<byte> readMemory, CancellationToken token)
+    {
+        if (currentPort is null ||
+            currentPort.BytesToRead <= 0 ||
+            !currentPort.IsOpen ||
+            currentPort.BreakState ||
+            token.IsCancellationRequested)
+            return;
+
+        var bytesRead = await currentPort.BaseStream
+            .ReadAsync(readMemory, token)
+            .ConfigureAwait(false);
+
+        if (bytesRead > 0)
+            DataBridge.ToNetBuffer.Enqueue(readMemory.Span[..bytesRead]);
+    }
+
+    private bool TryConnectWantedPort([MaybeNullWhen(false)] out SerialPort serialPort)
     {
         serialPort = null;
         var serialPortNames = SerialPort.GetPortNames();
@@ -139,17 +150,17 @@ internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
 
         try
         {
-            Logger.LogDebug("[Port] Attempting connection on {PortName}.", portName);
+            Logger.LogAttemptingConnection(LoggerName, portName);
             port = new SerialPort(portName,
                 Settings.BaudRate, Settings.Parity, Settings.DataBits, Settings.StopBits);
 
             port.Open();
-            Logger.LogInformation("[Port] Connection established on {PortName}.", portName);
+            Logger.LogPortConnected(LoggerName, portName);
             return true;
         }
         catch
         {
-            Logger.LogDebug("[Port] Connection on {PortName} failed.", portName);
+            Logger.LogConnectionFailed(LoggerName, portName);
             return false;
         }
     }
