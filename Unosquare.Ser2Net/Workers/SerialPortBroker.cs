@@ -13,8 +13,8 @@ internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var readBuffer = MemoryPool<byte>.Shared.Rent(4096);
-        var writeBuffer = MemoryPool<byte>.Shared.Rent(4096);
+        using var readBuffer = new MemoryBlock<byte>(4096);
+        using var writeBuffer = new MemoryBlock<byte>(4096);
 
         SerialPort? serialPort = null;
 
@@ -22,7 +22,7 @@ internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
         while (!stoppingToken.IsCancellationRequested)
         {
             // always dequeue regardless of connection state
-            var pendingWriteCount = DataBridge.ToPortBuffer.Dequeue(writeBuffer.Memory.Span);
+            var pendingWriteCount = DataBridge.ToPortBuffer.Dequeue(writeBuffer.Span);
 
             if (performDelay)
             {
@@ -43,12 +43,16 @@ internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
             try
             {
                 // receive data from serial port
-                var bytesRead = await serialPort.BaseStream
-                    .ReadAsync(readBuffer.Memory, stoppingToken)
-                    .ConfigureAwait(false);
-                
-                if (bytesRead > 0)
-                    DataBridge.ToNetBuffer.Enqueue(readBuffer.Memory[..bytesRead].Span);
+                if (serialPort.BytesToRead > 0)
+                {
+                    var bytesRead = await serialPort.BaseStream
+                        .ReadAsync(readBuffer.Memory, stoppingToken)
+                        .ConfigureAwait(false);
+
+                    if (bytesRead > 0)
+                        DataBridge.ToNetBuffer.Enqueue(readBuffer[..bytesRead]);
+
+                }
 
                 // send data to serial port
                 if (pendingWriteCount > 0)
@@ -63,17 +67,22 @@ internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
             }
             catch (Exception ex)
             {
+                Logger.LogInformation("Serial Port {PortName} Disconnected.", serialPort.PortName);
+                serialPort.Close();
                 serialPort.Dispose();
                 serialPort = null;
-                // TODO: log
+                
             }
         }
+
+        serialPort?.Dispose();
+        Logger.LogInformation("Serial Port Broker Exited");
 
         // TODO: check if port is in use
         // https://stackoverflow.com/questions/195483/c-sharp-check-if-a-com-serial-port-is-already-open
         //throw new NotImplementedException();
-        readBuffer.Dispose();
-        writeBuffer.Dispose();
+        //readBuffer.Dispose();
+        //writeBuffer.Dispose();
     }
 
     private bool TryConnectSerialPort([MaybeNullWhen(false)] out SerialPort serialPort)
@@ -94,7 +103,8 @@ internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
         // attempt connections
         foreach (var portName in wantedPortNames)
         {
-            if (TryConnectSerialPort(portName, out var wantedSerialPort))
+            if (TrySerialPortConnection(portName, out var wantedSerialPort) &&
+                wantedSerialPort is not null)
             {
                 serialPort = wantedSerialPort;
                 break;
@@ -123,23 +133,23 @@ internal class SerialPortBroker : BufferWorkerBase<SerialPortBroker>
         return [.. wantedPortNames];
     }
 
-    private bool TryConnectSerialPort(string portName, [MaybeNullWhen(false)] out SerialPort? port)
+    private bool TrySerialPortConnection(string portName, [MaybeNullWhen(false)] out SerialPort? port)
     {
         port = null;
 
         try
         {
+            Logger.LogDebug("[Port] Attempting connection on {PortName}.", portName);
             port = new SerialPort(portName,
                 Settings.BaudRate, Settings.Parity, Settings.DataBits, Settings.StopBits);
 
             port.Open();
-
-            // TODO: Log
+            Logger.LogInformation("[Port] Connection established on {PortName}.", portName);
             return true;
         }
         catch
         {
-            // TODO: Log
+            Logger.LogDebug("[Port] Connection on {PortName} failed.", portName);
             return false;
         }
     }

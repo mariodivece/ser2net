@@ -1,7 +1,7 @@
 ﻿namespace Unosquare.Ser2Net.Services;
 
 /// <summary>
-/// The main service host.
+/// The main hosted service that boostraps all of the sub-services.
 /// </summary>
 internal sealed class MainHostedService : WorkerBase<MainHostedService>
 {
@@ -9,8 +9,6 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
     /// Initializes a new instance of the <see cref="MainHostedService"/> class.
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
-    /// <param name="logger">The logger.</param>
-    /// <param name="environment">The environment.</param>
     public MainHostedService(
         ILogger<MainHostedService> logger,
         ServiceSettings settings,

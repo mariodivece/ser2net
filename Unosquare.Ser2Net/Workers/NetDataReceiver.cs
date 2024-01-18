@@ -29,7 +29,7 @@ internal class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
             {
                 try
                 {
-                    var readBuffer = await client.ReadAsync(stoppingToken).ConfigureAwait(false);
+                    var readBuffer = await client.ReceiveAsync(stoppingToken).ConfigureAwait(false);
                     DataBridge.ToPortBuffer.Enqueue(readBuffer.Span);
                 }
                 catch

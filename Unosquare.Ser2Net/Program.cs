@@ -9,9 +9,9 @@ internal static class Program
             .CreateDefaultBuilder(args)
             .ConfigureLifetimeAndLogging()
             .UseMainHostedService();
-        
+
         using var host = builder.Build();
-        
+
         await host.RunAsync(cts.Token).ConfigureAwait(false);
         return Environment.ExitCode;
     }

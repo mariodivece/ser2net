@@ -1,12 +1,17 @@
 ﻿namespace Unosquare.Ser2Net.Services;
 
+
+/// <summary>
+/// A network client that can send and receive data using TCP sockets.
+/// This class cannot be inherited.
+/// </summary>
 internal sealed class NetworkClient : IDisposable
 {
-    private readonly IMemoryOwner<byte> ReadBuffer;
-    private readonly SemaphoreSlim AsyncRoot = new(1, 1);
-
-    private bool _IsDisposed;
+    private const int DefaultReadBufferSize = 8192;
+    private readonly MemoryBlock<byte> ReadBuffer;
+    private long _IsDisposed;
     private bool _IsConnected = true;
+    private readonly SemaphoreSlim AsyncRoot = new(1, 1);
 
     public NetworkClient(ILogger<NetworkClient> logger, ServiceSettings settings, Socket socket)
     {
@@ -19,11 +24,11 @@ internal sealed class NetworkClient : IDisposable
         Logger = logger;
 
         // Configure the network client
-        BufferSize = Math.Max(4096, Settings.BaudRate / 8);
-        ReadBuffer = MemoryPool<byte>.Shared.Rent(BufferSize);
-        NetSocket.NoDelay = true;
+        BufferSize = Math.Max(DefaultReadBufferSize, Settings.BaudRate / 8);
+        ReadBuffer = new(BufferSize);
         NetSocket.ReceiveBufferSize = BufferSize;
         NetSocket.SendBufferSize = BufferSize;
+        NetSocket.NoDelay = true;
         NetSocket.Blocking = false;
         RemoteEndPoint = NetSocket.RemoteEndPoint ?? Constants.EmptyEndPoint;
     }
@@ -37,7 +42,7 @@ internal sealed class NetworkClient : IDisposable
         get
         {
             var isConnectedState = _IsConnected
-                && !_IsDisposed
+                && Interlocked.Read(ref _IsDisposed) == 0
                 && NetSocket.Connected;
 
             if (!isConnectedState)
@@ -65,42 +70,45 @@ internal sealed class NetworkClient : IDisposable
 
     private ServiceSettings Settings { get; }
 
-    public async ValueTask WriteAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    public async ValueTask SendAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
-        if (buffer.Length <= 0)
+        var pendingWriteCount = buffer.Length;
+        if (pendingWriteCount <= 0)
             return;
-
-        var hasErrors = false;
 
         try
         {
-            await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var maxChunkSize = Math.Min(NetSocket.SendBufferSize, pendingWriteCount);
 
-            if (!IsConnected)
-                throw new SocketException((int)SocketError.NotConnected);
+            while (pendingWriteCount > 0)
+            {
+                try
+                {
+                    await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    if (!IsConnected)
+                        throw new SocketException((int)SocketError.NotConnected);
 
-            await NetSocket.SendAsync(buffer, cancellationToken).ConfigureAwait(false);
+                    var writtenCount = await NetSocket.SendAsync(buffer[..maxChunkSize], cancellationToken).ConfigureAwait(false);
+                    pendingWriteCount -= writtenCount;
+                }
+                finally
+                {
+                    AsyncRoot.Release();
+                }
+            }
         }
         catch (Exception ex)
         {
-            hasErrors = true;
             Logger.LogErrorWriting(RemoteEndPoint, ex.Message);
-            Dispose(alsoManaged: true);
+            Dispose();
             throw;
-        }
-        finally
-        {
-            if (!hasErrors)
-                AsyncRoot.Release();
         }
     }
 
-    public async ValueTask<ReadOnlyMemory<byte>> ReadAsync(CancellationToken cancellationToken)
+    public async ValueTask<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken)
     {
-        var hasErrors = false;
         try
         {
-            await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
             var length = 0;
 
             if (!IsConnected)
@@ -108,11 +116,19 @@ internal sealed class NetworkClient : IDisposable
 
             while (NetSocket.Available > 0 && !cancellationToken.IsCancellationRequested)
             {
-                var bytesRead = await NetSocket.ReceiveAsync(ReadBuffer.Memory[length..], cancellationToken);
-                length += bytesRead;
+                try
+                {
+                    await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    var bytesRead = await NetSocket.ReceiveAsync(ReadBuffer.Memory[length..], cancellationToken);
+                    length += bytesRead;
 
-                if (bytesRead <= 0 || length >= ReadBuffer.Memory.Length)
-                    break;
+                    if (bytesRead <= 0 || length >= ReadBuffer.Length)
+                        break;
+                }
+                finally
+                {
+                    AsyncRoot.Release();
+                }
             }
 
             return length == 0
@@ -121,15 +137,9 @@ internal sealed class NetworkClient : IDisposable
         }
         catch (Exception ex)
         {
-            hasErrors = true;
             Logger.LogErrorReading(RemoteEndPoint, ex.Message);
-            Dispose(alsoManaged: true);
+            Dispose();
             throw;
-        }
-        finally
-        {
-            if (!hasErrors)
-                AsyncRoot.Release();
         }
     }
 
@@ -141,18 +151,19 @@ internal sealed class NetworkClient : IDisposable
 
     private void Dispose(bool alsoManaged)
     {
-        if (_IsDisposed) return;
-        _IsConnected = false;
-        _IsDisposed = true;
+        if (Interlocked.Increment(ref _IsDisposed) > 1)
+            return;
 
-        if (alsoManaged)
-        {
-            _IsConnected = false;
-            NetSocket.Close();
-            ReadBuffer.Dispose();
-            AsyncRoot.Dispose();
-            Logger.LogClientDisconnected(RemoteEndPoint);
-        }
+        _IsConnected = false;
+
+        if (!alsoManaged)
+            return;
+
+        _IsConnected = false;
+        NetSocket.Close();
+        ReadBuffer.Dispose();
+        AsyncRoot.Dispose();
+        Logger.LogClientDisconnected(RemoteEndPoint);
     }
 
 }

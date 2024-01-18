@@ -22,8 +22,7 @@ public sealed class MemoryQueue<T> : IDisposable
     private int m_Count;
     private int ReadHead;
     private int WriteTail;
-    private IMemoryOwner<T> Buffer;
-    private MemoryHandle BufferHandle;
+    private MemoryBlock<T> Buffer;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MemoryQueue{T}"/> class.
@@ -42,8 +41,7 @@ public sealed class MemoryQueue<T> : IDisposable
     {
         InitialCapacity = initialCapacity > 0 ? initialCapacity : DefaultInitialCapacity;
         CapacityGrowth = InitialCapacity - 1;
-        Buffer = MemoryPool<T>.Shared.Rent(initialCapacity);
-        BufferHandle = Buffer.Memory.Pin();
+        Buffer = new(initialCapacity);
     }
 
     /// <summary>
@@ -67,7 +65,7 @@ public sealed class MemoryQueue<T> : IDisposable
         get
         {
             lock (SyncLock)
-                return Buffer.Memory.Length;
+                return Buffer.Length;
         }
     }
 
@@ -148,17 +146,17 @@ public sealed class MemoryQueue<T> : IDisposable
 
                 if (rightLength >= inputCount)
                 {
-                    BlockCopy(elements, sourceOffset, Buffer, WriteTail, inputCount);
+                    elements.CopyTo(sourceOffset, Buffer, WriteTail, inputCount);
                 }
                 else
                 {
-                    BlockCopy(elements, sourceOffset, Buffer, WriteTail, rightLength);
-                    BlockCopy(elements, sourceOffset + rightLength, Buffer, 0, inputCount - rightLength);
+                    elements.CopyTo(sourceOffset, Buffer, WriteTail, rightLength);
+                    elements.CopyTo(sourceOffset + rightLength, Buffer, 0, inputCount - rightLength);
                 }
             }
             else
             {
-                BlockCopy(elements, sourceOffset, Buffer, WriteTail, inputCount);
+                elements.CopyTo(sourceOffset, Buffer, WriteTail, inputCount);
             }
 
             WriteTail = (WriteTail + inputCount) % Capacity;
@@ -276,7 +274,6 @@ public sealed class MemoryQueue<T> : IDisposable
             if (m_IsDisposed) return;
 
             m_IsDisposed = true;
-            BufferHandle.Dispose();
             Buffer.Dispose();
         }
     }
@@ -309,7 +306,7 @@ public sealed class MemoryQueue<T> : IDisposable
 
             if (ReadHead < WriteTail)
             {
-                BlockCopy(Buffer, ReadHead, destination, targetOffset, targetCount);
+                Buffer.CopyTo(ReadHead, destination, targetOffset, targetCount);
             }
             else
             {
@@ -317,12 +314,12 @@ public sealed class MemoryQueue<T> : IDisposable
 
                 if (rightLength >= targetCount)
                 {
-                    BlockCopy(Buffer, ReadHead, destination, targetOffset, targetCount);
+                    Buffer.CopyTo(ReadHead, destination, targetOffset, targetCount);
                 }
                 else
                 {
-                    BlockCopy(Buffer, ReadHead, destination, targetOffset, rightLength);
-                    BlockCopy(Buffer, 0, destination, targetOffset + rightLength, targetCount - rightLength);
+                    Buffer.CopyTo(ReadHead, destination, targetOffset, rightLength);
+                    Buffer.CopyTo(0, destination, targetOffset + rightLength, targetCount - rightLength);
                 }
             }
 
@@ -342,72 +339,34 @@ public sealed class MemoryQueue<T> : IDisposable
         }
     }
 
-    #region Memory Management
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void Reallocate(int newCapacity)
     {
         if (newCapacity <= Capacity)
             return;
 
-        var newBuffer = MemoryPool<T>.Shared.Rent(newCapacity);
+        var newBuffer = new MemoryBlock<T>(newCapacity);
 
         if (Count > 0)
         {
             if (ReadHead < WriteTail)
             {
-                BlockCopy(Buffer, ReadHead, newBuffer, 0, Count);
+                Buffer.CopyTo(ReadHead, newBuffer, 0, Count);
             }
             else
             {
-                BlockCopy(Buffer, ReadHead, newBuffer, 0, Capacity - ReadHead);
-                BlockCopy(Buffer, 0, newBuffer, Capacity - ReadHead, WriteTail);
+                Buffer.CopyTo(ReadHead, newBuffer, 0, Capacity - ReadHead);
+                Buffer.CopyTo(0, newBuffer, Capacity - ReadHead, WriteTail);
             }
         }
 
         ReadHead = 0;
         WriteTail = Count;
 
-        // dispose the old buffer and memory handle
-        BufferHandle.Dispose();
+        // dispose the old buffer
         Buffer.Dispose();
 
         // Set the internal buffer to the newly allocated one
         Buffer = newBuffer;
-        BufferHandle = Buffer.Memory.Pin();
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int BlockCopy(ReadOnlySpan<T> source, int sourceOffset, Span<T> destination, int destinationOffset, int count)
-    {
-        var maxSourceCount = source.Length - sourceOffset;
-        var maxDestinationCount = destination.Length - destinationOffset;
-        var maxCount = Math.Min(maxSourceCount, maxDestinationCount);
-
-        if (count > maxCount)
-            count = maxCount;
-
-        if (count > 0 &&
-            source.Slice(sourceOffset, count).TryCopyTo(
-            destination.Slice(destinationOffset, count)))
-        {
-            return count;
-        }
-
-        return 0;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int BlockCopy(IMemoryOwner<T> source, int sourceOffset, Span<T> destination, int destinationOffset, int count) =>
-        BlockCopy(source.Memory.Span, sourceOffset, destination, destinationOffset, count);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int BlockCopy(IMemoryOwner<T> source, int sourceOffset, IMemoryOwner<T> destination, int destinationOffset, int count) =>
-        BlockCopy(source.Memory.Span, sourceOffset, destination.Memory.Span, destinationOffset, count);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int BlockCopy(ReadOnlySpan<T> source, int sourceOffset, IMemoryOwner<T> destination, int destinationOffset, int count) =>
-        BlockCopy(source, sourceOffset, destination.Memory.Span, destinationOffset, count);
-
-    #endregion
 }

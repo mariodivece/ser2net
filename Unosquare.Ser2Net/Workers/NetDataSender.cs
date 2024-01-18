@@ -32,7 +32,7 @@ internal class NetDataSender : BufferWorkerBase<NetDataSender>
             {
                 try
                 {
-                    await client.WriteAsync(echoBytes, stoppingToken).ConfigureAwait(false);
+                    await client.SendAsync(echoBytes, stoppingToken).ConfigureAwait(false);
                 }
                 catch
                 {
