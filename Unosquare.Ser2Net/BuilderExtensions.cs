@@ -25,39 +25,82 @@ internal static class BuilderExtensions
     {
         if (WindowsServiceHelpers.IsWindowsService())
         {
-            builder
-                .UseWindowsService(options => options.ServiceName = Constants.SerivceName)
-                .ConfigureEventLogLogging();
+            builder.UseWindowsService();
+            builder.ConfigureLogging((context, logging) =>
+            {
+                // we don't want to use the event log
+                // we will just use the file.
+                logging.ClearProviders();
+            });
         }
         else if (SystemdHelpers.IsSystemdService())
         {
             builder.UseSystemd();
             builder.ConfigureLogging((context, logging) =>
             {
-                logging
-                    .RemoveLoggingProvidersExcept(typeof(ConsoleLoggerProvider))
-                    .SetMinimumLevel(LogLevel.Trace);
+                logging.RemoveLoggingProvidersExcept(
+                    typeof(ConsoleLoggerProvider));
+            });
+        }
+        else
+        {
+            builder.UseConsoleLifetime();
+        }
+
+        if (WindowsServiceHelpers.IsWindowsService())
+        {
+            builder
+                .UseWindowsService(options => options.ServiceName = Constants.SerivceName)
+                .ConfigureWindowsEventLogLogging();
+        }
+        else if (SystemdHelpers.IsSystemdService())
+        {
+            builder.UseSystemd();
+            builder.ConfigureLogging((context, logging) =>
+            {
+                logging.RemoveLoggingProvidersExcept(
+                    typeof(ConsoleLoggerProvider));
             });
         }
         else
         {
             // Running as a console application
-            builder.UseConsoleLifetime();
-            builder.ConfigureLogging((context, logging) =>
-            {
-                var serilogLogger = new LoggerConfiguration()
-                    .WriteTo.Console()
-                    .MinimumLevel.Verbose()
-                    .CreateLogger();
+            builder
+                .UseConsoleLifetime()
+                .ConfigureLogging((context, logging) =>
+                {
+                    var serilogLogger = new LoggerConfiguration()
+                        .WriteTo.Console()
+                        .MinimumLevel.Is(context.HostingEnvironment.IsProduction() ? Serilog.Events.LogEventLevel.Information : Serilog.Events.LogEventLevel.Debug)
+                        .CreateLogger();
 
-                // Set a global static logger
-                Log.Logger = serilogLogger;
+                    /*
+                     *        var serilogLogger = new LoggerConfiguration()
+            .MinimumLevel.Is(Debugger.IsAttached ? LogEventLevel.Verbose : LogEventLevel.Information)
+            .WriteTo.Async(f => f.File(@"f:\log\log.txt", rollingInterval: RollingInterval.Day))
+    .CreateLogger(); 
+                     * 
+                    */
 
-                logging
-                    .ClearProviders()
-                    .AddSerilog(serilogLogger, true);
-            });
+                    // Set a global static logger
+                    Log.Logger = serilogLogger;
+
+                    logging
+                        .ClearProviders()
+                        .AddSerilog(serilogLogger, dispose: true)
+                        .SetMinimumLevel(LogLevel.Trace);
+                });
         }
+
+        // set the minimum log level according to environment
+        builder.ConfigureLogging((context, logging) =>
+        {
+            var logLevel = context.HostingEnvironment.IsProduction()
+                ? LogLevel.Information
+                : LogLevel.Trace;
+
+            logging.SetMinimumLevel(logLevel);
+        });
 
         return builder;
     }
@@ -90,7 +133,7 @@ internal static class BuilderExtensions
     }
 
     [SupportedOSPlatform("windows")]
-    private static T ConfigureEventLogLogging<T>(this T builder)
+    private static T ConfigureWindowsEventLogLogging<T>(this T builder)
         where T : IHostBuilder
     {
         // TODO: Need to register EventSource name in EventLog if it does not exist.
@@ -125,5 +168,4 @@ internal static class BuilderExtensions
 
         return logging;
     }
-
 }
