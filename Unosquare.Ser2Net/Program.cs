@@ -4,26 +4,19 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        //var x = Host.CreateDefaultBuilder(args);
-
         using var cts = new CancellationTokenSource();
+
+        // Here we create the host builder from scratch
+        // as opposed to using Host.CreateDefaultBuilder(args)
+        // because we need to keep this as lightweight and speceific
+        // as possible without adding a bunch of unnecessary service
+        // dependencies.
         var builder = new HostBuilder()
-            .ConfigureAppConfiguration((context, config) =>
-            {
-                context.HostingEnvironment.EnvironmentName = Debugger.IsAttached
-                    ? Environments.Development
-                    : Environments.Production;
-                context.HostingEnvironment.ContentRootPath = Environment.CurrentDirectory;
-                config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: false);
-            })
+            .ConfigureHostEnvironment()
             .ConfigureLifetimeAndLogging()
             .UseMainHostedService();
 
-        // Build will fail because we have configured
-        // environment = development and validation
-        // of transient services is strict.
         using var host = builder.Build();
-
         await host.RunAsync(cts.Token).ConfigureAwait(false);
         return Environment.ExitCode;
     }

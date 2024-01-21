@@ -41,4 +41,6 @@ internal static class Constants
     public const int ShortDelayMilliseconds = 1;
 
     public const int BridgeQueueSize = 2048;
+
+    public const string SettingsFilename = "appsettings.json";
 }
