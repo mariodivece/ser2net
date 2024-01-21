@@ -48,6 +48,8 @@ internal static class Program
         return Environment.ExitCode;
 
         // TODO: args install/reinstall and uninstall
+        // TODO: Log current settings on startup
+        // TODO: Allow for multiple serial ports/servers in config and functionally
     }
 
     public static RuntimeMode RuntimeMode => runtimeMode.Value;
