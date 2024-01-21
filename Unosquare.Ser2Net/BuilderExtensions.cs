@@ -70,10 +70,10 @@ internal static class BuilderExtensions
     public static T ConfigureLifetimeAndLogging<T>(this T builder)
         where T : IHostBuilder
     {
-        switch (RuntimeMode)
+        switch (Program.RuntimeMode)
         {
             case RuntimeMode.WindowsService:
-                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                if (Program.Platform != OSPlatform.Windows)
                     throw new PlatformNotSupportedException();
 
                 builder
@@ -85,22 +85,22 @@ internal static class BuilderExtensions
                 break;
             case RuntimeMode.LinuxSystemd:
 
-                builder.
-                    UseSystemd()
+                builder
+                    .UseSystemd()
                     .ClearLoggingProvidersExcept(typeof(ConsoleLoggerProvider))
                     .AddSerilogLogging(useConsole: false, useFiles: true); ;
 
                 break;
             case RuntimeMode.Console:
 
-                builder.UseConsoleLifetime()
+                builder
+                    .UseConsoleLifetime()
                     .ClearLoggingProviders()
                     .AddSerilogLogging(useConsole: true, useFiles: true);
 
                 break;
             default:
                 throw new PlatformNotSupportedException();
-
         }
 
         return builder;
@@ -132,13 +132,6 @@ internal static class BuilderExtensions
 
         return builder;
     }
-
-    private static RuntimeMode RuntimeMode =>
-        WindowsServiceHelpers.IsWindowsService()
-        ? RuntimeMode.WindowsService
-        : SystemdHelpers.IsSystemdService()
-        ? RuntimeMode.LinuxSystemd
-        : RuntimeMode.Console;
 
     private static T AddSerilogLogging<T>(this T builder, bool useConsole, bool useFiles)
         where T : IHostBuilder
@@ -209,7 +202,7 @@ internal static class BuilderExtensions
     {
         // TODO: Need to register EventSource name in EventLog if it does not exist.
         // This requires elevation. Unsure is windows service automatically adds. Will
-        // nee to test.
+        // need to test and understand more.
 
         builder.ConfigureLogging((context, logging) =>
         {

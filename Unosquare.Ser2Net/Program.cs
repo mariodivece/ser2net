@@ -1,10 +1,27 @@
-﻿namespace Unosquare.Ser2Net;
+﻿using Microsoft.Extensions.Hosting.Systemd;
+using Microsoft.Extensions.Hosting.WindowsServices;
+
+namespace Unosquare.Ser2Net;
 
 /// <summary>
 /// The program holding the man entry point of the application.
 /// </summary>
 internal static class Program
 {
+    private static readonly Lazy<RuntimeMode> runtimeMode = new(() => 
+        WindowsServiceHelpers.IsWindowsService()
+        ? RuntimeMode.WindowsService
+        : SystemdHelpers.IsSystemdService()
+        ? RuntimeMode.LinuxSystemd
+        : RuntimeMode.Console);
+
+    private static readonly Lazy<OSPlatform> platform = new(() => 
+        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? OSPlatform.Windows
+        : RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+        ? OSPlatform.Linux
+        : OSPlatform.Create("NONE"));
+
     /// <summary>
     /// Main entry-point for this application.
     /// </summary>
@@ -29,5 +46,11 @@ internal static class Program
         using var host = builder.Build();
         await host.RunAsync(cts.Token).ConfigureAwait(false);
         return Environment.ExitCode;
+
+        // TODO: args install/reinstall and uninstall
     }
+
+    public static RuntimeMode RuntimeMode => runtimeMode.Value;
+
+    public static OSPlatform Platform => platform.Value;
 }
