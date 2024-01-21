@@ -61,7 +61,9 @@ public sealed class MemoryBlock<T> : IDisposable
     /// <returns>
     /// The result of the operation.
     /// </returns>
-    public static implicit operator Memory<T>(MemoryBlock<T> block) => block.MemoryManager.Memory;
+    public static implicit operator Memory<T>(MemoryBlock<T> block) => block is not null
+        ? block.MemoryManager.Memory
+        : Memory<T>.Empty;
 
     /// <summary>
     /// Implicit cast that converts the given <see cref="MemoryBlock{T}"/> to a <see cref="Span{T}"/>.
@@ -70,7 +72,25 @@ public sealed class MemoryBlock<T> : IDisposable
     /// <returns>
     /// The result of the operation.
     /// </returns>
-    public static implicit operator Span<T>(MemoryBlock<T> block) => block.MemoryManager.GetSpan();
+    public static implicit operator Span<T>(MemoryBlock<T> block) => block is not null
+        ? block.MemoryManager.GetSpan()
+        : [];
+
+    /// <summary>
+    /// Converts this instance to a <see cref="Memory{T}"/>.
+    /// </summary>
+    /// <returns>
+    /// The <see cref="Memory"/> of this instance.
+    /// </returns>
+    public Memory<T> ToMemory() => MemoryManager.Memory;
+
+    /// <summary>
+    /// Converts this instance to a <see cref="Span{T}"/>.
+    /// </summary>
+    /// <returns>
+    /// The <see cref="Span"/> of this instance.
+    /// </returns>
+    public Span<T> ToSpan() => MemoryManager.GetSpan();
 
     /// <summary>
     /// Returns a handle to the memory that has been pinned and whose address can be taken.
@@ -81,7 +101,6 @@ public sealed class MemoryBlock<T> : IDisposable
     /// A <see cref="MemoryHandle"/>.
     /// </returns>
     public MemoryHandle Pin(int elementIndex = 0) => MemoryManager.Pin(elementIndex);
-
 
     /// <summary>
     /// <seealso cref="Span{T}.Slice(int)"/>
@@ -129,5 +148,4 @@ public sealed class MemoryBlock<T> : IDisposable
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
-
 }

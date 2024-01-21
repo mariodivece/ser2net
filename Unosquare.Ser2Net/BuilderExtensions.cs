@@ -59,7 +59,8 @@ internal static class BuilderExtensions
 
     /// <summary>
     /// Extension method that configures the lifetime and logging
-    /// providers for the host. This is all dependent of the host.
+    /// providers for the host. This is all dependent of the host
+    /// platofrm and runtime information.
     /// </summary>
     /// <typeparam name="T">The host builder type.</typeparam>
     /// <param name="builder">The host builder.</param>
@@ -112,7 +113,7 @@ internal static class BuilderExtensions
     /// <typeparam name="T">Generic type parameter.</typeparam>
     /// <param name="builder">The host builder.</param>
     /// <returns>
-    /// The host builder for fluent API support.
+    /// The same object for fluent API support.
     /// </returns>
     public static T UseMainHostedService<T>(this T builder)
         where T : IHostBuilder

@@ -7,6 +7,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Unosquare.Ser2Net", "Unosqu
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Support", "Support", "{DC7A0FA0-0094-4322-BB66-22B7B507DACD}"
 	ProjectSection(SolutionItems) = preProject
+		Support\app-icon-highres-128.png = Support\app-icon-highres-128.png
+		Support\app-icon-highres-400.png = Support\app-icon-highres-400.png
+		Support\installservice.bat = Support\installservice.bat
 		LICENSE = LICENSE
 		README.md = README.md
 	EndProjectSection

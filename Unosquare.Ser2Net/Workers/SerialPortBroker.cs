@@ -7,12 +7,12 @@ internal sealed class SerialPortBroker(ILogger<SerialPortBroker> logger, Service
     BufferWorkerBase<SerialPortBroker>(logger, settings, dataBridge)
 {
     const string LoggerName = "Serial";
+    private SerialPort? Port;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var readBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
         using var writeBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
-        SerialPort? serialPort = null;
 
         try
         {
@@ -24,12 +24,13 @@ internal sealed class SerialPortBroker(ILogger<SerialPortBroker> logger, Service
                 var pendingWriteLength = DataBridge.ToPortBuffer.Dequeue(writeBuffer);
 
                 // Attempt serial port connection if one is not active.
-                if (serialPort is null && !TryConnectWantedPort(out serialPort))
+                if (Port is null && !TryConnectWantedPort(out Port))
                 {
                     // give the loop a break. Don't go as fast as possible
                     // retrying serial port connection so we don't peg a core
                     // unnecessarily. Don't make the delay too long because we might
                     // still have data being queued up.
+                    Port?.Dispose();
                     await Task.Delay(Constants.LongDelayMillisconds, stoppingToken)
                         .ConfigureAwait(false);
 
@@ -39,12 +40,12 @@ internal sealed class SerialPortBroker(ILogger<SerialPortBroker> logger, Service
                 try
                 {
                     // fire up the receive task
-                    var receiveTask = ReceiveSerialPortDataAsync(serialPort, readBuffer, stoppingToken);
+                    var receiveTask = ReceiveSerialPortDataAsync(Port, readBuffer, stoppingToken);
 
                     // send data to serial port
                     if (pendingWriteLength > 0)
                     {
-                        await serialPort.BaseStream
+                        await Port.BaseStream
                             .WriteAsync(writeBuffer[..pendingWriteLength], stoppingToken)
                             .ConfigureAwait(false);
                     }
@@ -53,15 +54,15 @@ internal sealed class SerialPortBroker(ILogger<SerialPortBroker> logger, Service
                     await receiveTask.ConfigureAwait(false);
 
                     // give the task a break if there's nothing to do at this point
-                    if (serialPort is not null && serialPort.BytesToRead <= 0 && DataBridge.ToPortBuffer.Count <= 0)
+                    if (Port is not null && Port.BytesToRead <= 0 && DataBridge.ToPortBuffer.Count <= 0)
                         await Task.Delay(1, stoppingToken).ConfigureAwait(false);
                 }
                 catch
                 {
-                    Logger.LogPortDisconnected(LoggerName, serialPort?.PortName ?? "NOPORT");
-                    serialPort?.Close();
-                    serialPort?.Dispose();
-                    serialPort = null;
+                    Logger.LogPortDisconnected(LoggerName, Port?.PortName ?? "NOPORT");
+                    Port?.Close();
+                    Port?.Dispose();
+                    Port = null;
                 }
             }
         }
@@ -71,7 +72,7 @@ internal sealed class SerialPortBroker(ILogger<SerialPortBroker> logger, Service
         }
         finally
         {
-            serialPort?.Dispose();
+            Port?.Dispose();
             Logger.LogBrokerStopped(LoggerName);
         }
     }

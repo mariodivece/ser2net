@@ -30,7 +30,7 @@ internal sealed class NetServer : WorkerBase<NetServer>
             if (Equals(m_Clients[key], client) &&
                 m_Clients.TryRemove(key, out _))
             {
-                client?.Dispose();
+                client.Dispose();
                 break;
             }
         }

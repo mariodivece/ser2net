@@ -7,18 +7,63 @@
 		<LangVersion>latest</LangVersion>
 		<OutputType>exe</OutputType>
 		<AssemblyName>unoser2net</AssemblyName>
+		<Version>2024.1.21-b3</Version>
 		<PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 		<PlatformTarget>x64</PlatformTarget>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<!--
 		<PublishAot>true</PublishAot>
-		-->
-		<PublishAot>true</PublishAot>
-		<AnalysisMode>recommended</AnalysisMode>
+		<AnalysisMode>all</AnalysisMode>
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+		<PackageIcon>app-icon-highres-128.png</PackageIcon>
+		<Title>Unosquare Ser2Net Service</Title>
+		<Authors>mariodivece</Authors>
+		<Company>Unosquare</Company>
+		<Description>A cross-platform version of the linux ser2net utility.</Description>
+		<PackageProjectUrl>https://github.com/mariodivece/ser2net</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/mariodivece/ser2net</RepositoryUrl>
+		<RepositoryType>github</RepositoryType>
+		<PackageTags>serial port;ethernet;proxy</PackageTags>
+		<NeutralLanguage>en-US</NeutralLanguage>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<IncludeSymbols>True</IncludeSymbols>
+		<Copyright>Copyright (c) 2024 Mario Di Vece and Contributors</Copyright>
+		<Trimming>full</Trimming>
 		
 	</PropertyGroup>
+
+	<ItemGroup>
+	  <None Remove="Resources\icon.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <_WebToolingArtifacts Remove="Properties\PublishProfiles\win-x64.pubxml" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Include="Resources\icon.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Include="Resources\icon.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="..\LICENSE">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	  <None Include="..\README.md">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	  <None Include="..\Support\app-icon-highres-128.png">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="8.0.0" />

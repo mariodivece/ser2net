@@ -120,7 +120,10 @@ internal sealed class NetworkClient : IDisposable
                 try
                 {
                     await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    var bytesRead = await NetSocket.ReceiveAsync(ReadBuffer.Memory[length..], cancellationToken);
+                    var bytesRead = await NetSocket
+                        .ReceiveAsync(ReadBuffer.Memory[length..], cancellationToken)
+                        .ConfigureAwait(false);
+                    
                     length += bytesRead;
 
                     if (bytesRead <= 0 || length >= ReadBuffer.Length)

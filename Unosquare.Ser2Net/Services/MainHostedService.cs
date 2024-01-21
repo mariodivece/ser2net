@@ -60,7 +60,8 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
                 NetworkServer,
                 NetworkDataReceiver,
                 NetworkDataSender,
-                PortBroker);
+                PortBroker)
+                .ConfigureAwait(false);
         }
         catch (TaskCanceledException)
         {
