@@ -42,5 +42,5 @@ internal static class Constants
 
     public const int BridgeQueueSize = 2048;
 
-    public const string SettingsFilename = "appsettings.json";
+    public const string SettingsFilename = "unoser2net.json";
 }
