@@ -23,13 +23,6 @@ internal static class BuilderExtensions
     public static T ConfigureLifetimeAndLogging<T>(this T builder)
         where T : IHostBuilder
     {
-        builder.ConfigureAppConfiguration((context, app) =>
-        {
-            context.HostingEnvironment.EnvironmentName = Debugger.IsAttached
-                ? Environments.Development
-                : Environments.Production;
-        });
-
         if (WindowsServiceHelpers.IsWindowsService())
         {
             builder
