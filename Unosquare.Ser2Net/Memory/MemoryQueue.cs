@@ -1,28 +1,43 @@
 ﻿namespace Unosquare.Ser2Net.Memory;
 
 /// <summary>
-/// Defines a class that represents a generic resizable circular queue.
-/// Initially taken from
+/// Defines a class that represents a generic, resizable circular queue.
+/// Ideas initially taken from
 /// https://raw.githubusercontent.com/kelindar/circular-buffer/master/Source/ByteQueue.cs
+/// but then modernized it and changed it to use native memory for added performance.
 /// This class is ideal for byte (or any unmanaged type) buffers as memory
 /// is allocated in a contiguous manner and most methods are suitable for
 /// <see cref="Span{T}"/> types as opposed to individual elements.
 /// </summary>
-/// <remarks>This class is thread-safe.</remarks>
+/// <remarks>
+/// This class is thread-safe.
+/// It is recommended that you initially
+/// </remarks>
 public sealed class MemoryQueue<T> : IDisposable
     where T : unmanaged
 {
-    private const int DefaultInitialCapacity = 2048;
+    private const int DefaultInitialCapacity = 1024;
 
     private readonly int InitialCapacity;
     private readonly int CapacityGrowth;
     private readonly object SyncLock = new();
 
-    private bool m_IsDisposed;
     private int m_Count;
-    private int ReadHead;
-    private int WriteTail;
-    private MemoryBlock<T> Buffer;
+
+    /// <summary>
+    /// Zero-based index of read operations, AKA the 'Head'.
+    /// </summary>
+    internal int ReadIndex;
+
+    /// <summary>
+    /// Zero-based index of write operations, AKA the 'Tail'
+    /// </summary>
+    internal int WriteIndex;
+
+    /// <summary>
+    /// The region of memory holding the elements.
+    /// </summary>
+    internal MemoryBlock<T> Buffer;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MemoryQueue{T}"/> class.
@@ -45,20 +60,9 @@ public sealed class MemoryQueue<T> : IDisposable
     }
 
     /// <summary>
-    /// Gets a value indicating whether this instance has been disposed.
-    /// </summary>
-    public bool IsDisposed
-    {
-        get
-        {
-            lock (SyncLock)
-                return m_IsDisposed;
-        }
-    }
-
-    /// <summary>
     /// Gest the current capacity of the internal buffer
-    /// expressed in number of elements.
+    /// expressed in number of elements. When at full capacity,
+    /// queueing new elements results in automatic growth.
     /// </summary>
     public int Capacity
     {
@@ -79,11 +83,7 @@ public sealed class MemoryQueue<T> : IDisposable
             lock (SyncLock)
                 return m_Count;
         }
-        private set
-        {
-            lock (SyncLock)
-                m_Count = value;
-        }
+        private set => m_Count = value;
     }
 
     /// <summary>
@@ -93,8 +93,8 @@ public sealed class MemoryQueue<T> : IDisposable
     {
         lock (SyncLock)
         {
-            ReadHead = 0;
-            WriteTail = 0;
+            ReadIndex = 0;
+            WriteIndex = 0;
             Count = 0;
         }
     }
@@ -112,13 +112,13 @@ public sealed class MemoryQueue<T> : IDisposable
             if (elementCount <= 0)
                 return;
 
-            ReadHead = (ReadHead + elementCount) % Capacity;
+            ReadIndex = (ReadIndex + elementCount) % Capacity;
             Count -= elementCount;
 
             if (Count == 0)
             {
-                ReadHead = 0;
-                WriteTail = 0;
+                ReadIndex = 0;
+                WriteIndex = 0;
             }
         }
     }
@@ -129,55 +129,52 @@ public sealed class MemoryQueue<T> : IDisposable
     /// <param name="elements">The set coontaining the elements to add.</param>
     public void Enqueue(ReadOnlySpan<T> elements)
     {
-        const int sourceOffset = 0;
-        var inputCount = elements.Length;
+        //const int sourceOffset = 0;
+        var elementCount = elements.Length;
 
-        if (inputCount <= 0)
+        if (elementCount <= 0)
             return;
 
         lock (SyncLock)
         {
-            if (Count + inputCount > Capacity)
-                Reallocate(Count + inputCount + CapacityGrowth & ~CapacityGrowth);
-
-            if (ReadHead < WriteTail)
+            // grow the underlying buffer if there's no more room
+            if (Count + elementCount > Capacity)
             {
-                int rightLength = Capacity - WriteTail;
+                var newCapacity = (Count + elementCount + CapacityGrowth) & ~CapacityGrowth;
+                Reallocate(newCapacity);
+            }
 
-                if (rightLength >= inputCount)
-                {
-                    elements.CopyTo(sourceOffset, Buffer, WriteTail, inputCount);
-                }
-                else
-                {
-                    elements.CopyTo(sourceOffset, Buffer, WriteTail, rightLength);
-                    elements.CopyTo(sourceOffset + rightLength, Buffer, 0, inputCount - rightLength);
-                }
+            // compute the number of available slots to write to the right
+            // of the write index.
+            var rightSlotCount = Capacity - WriteIndex;
+
+            if (ReadIndex >= WriteIndex || rightSlotCount >= elementCount)
+            {
+                // happy-path copy set of range
+                // where we copy all source elements in one go and we have enough
+                // room in the target buffer
+                var sourceRange = ..elementCount;
+                var targetRange = WriteIndex..(WriteIndex + elementCount);
+                elements[sourceRange].CopyTo(Buffer[targetRange].Span);
             }
             else
             {
-                elements.CopyTo(sourceOffset, Buffer, WriteTail, inputCount);
+                // Copy to the right buffer slots
+                var sourceRange = ..rightSlotCount;
+                var targetRange = WriteIndex..(WriteIndex + rightSlotCount);
+                elements[sourceRange].CopyTo(Buffer[targetRange].Span);
+
+                // Copy to the left buffer slots
+                var leftSlotCount = elementCount - rightSlotCount;
+                sourceRange = rightSlotCount..elementCount;
+                targetRange = ..leftSlotCount;
+                elements[sourceRange].CopyTo(Buffer[targetRange].Span);
             }
 
-            WriteTail = (WriteTail + inputCount) % Capacity;
-            Count += inputCount;
+            WriteIndex = (WriteIndex + elementCount) % Capacity;
+            Count += elementCount;
         }
     }
-
-    /// <summary>
-    /// Adds the provided elements to the queue.
-    /// </summary>
-    /// <param name="elements">The set coontaining the elements to add.</param>
-    /// <param name="startIndex">The start index of the elements being added.</param>
-    public void Enqueue(ReadOnlySpan<T> elements, int startIndex) => Enqueue(elements[startIndex..]);
-
-    /// <summary>
-    /// Adds the provided elements to the queue.
-    /// </summary>
-    /// <param name="elements">The set coontaining the elements to add.</param>
-    /// <param name="startIndex">The start index of the elements being added.</param>
-    /// <param name="count">The maximum number of elements to add.</param>
-    public void Enqueue(ReadOnlySpan<T> elements, int startIndex, int count) => Enqueue(elements.Slice(startIndex, count));
 
     /// <summary>
     /// Dequeues the elements into a destination set.
@@ -185,23 +182,6 @@ public sealed class MemoryQueue<T> : IDisposable
     /// <param name="destination">The set in which the dequeued elements will be held.</param>
     /// <returns>The number of elements that were dequeued.</returns>
     public int Dequeue(Span<T> destination) => PeekOrDequeue(destination, doDequeue: true);
-
-    /// <summary>
-    /// Dequeues the elements into a destination set.
-    /// </summary>
-    /// <param name="destination">The set in which the dequeued elements will be held.</param>
-    /// <param name="startIndex">The start index at which the destination is written with dequeued elements.</param>
-    /// <returns>The number of elements that were dequeued.</returns>
-    public int Dequeue(Span<T> destination, int startIndex) => Dequeue(destination[startIndex..]);
-
-    /// <summary>
-    /// Dequeues the elements into a destination set.
-    /// </summary>
-    /// <param name="destination">The set in which the dequeued elements will be held.</param>
-    /// <param name="startIndex">The start index at which the destination is written with dequeued elements.</param>
-    /// <param name="count">The maximum number of elements to dequeue.</param>
-    /// <returns>The number of elements that were dequeued.</returns>
-    public int Dequeue(Span<T> destination, int startIndex, int count) => Dequeue(destination.Slice(startIndex, count));
 
     /// <summary>
     /// Dequeues the specified number of elements off the queue.
@@ -214,7 +194,7 @@ public sealed class MemoryQueue<T> : IDisposable
     /// Dequeues all the available elements off the queue.
     /// </summary>
     /// <returns>The dequeued elements.</returns>
-    public T[] DequeueAll() => Dequeue(Timeout.Infinite);
+    public T[] DequeueAll() => PeekOrDequeue(Timeout.Infinite, doDequeue: true);
 
     /// <summary>
     /// Attempts to retrieve an element, without removing it from the queue,
@@ -234,7 +214,10 @@ public sealed class MemoryQueue<T> : IDisposable
         if (offsetIndex < 0)
             offsetIndex = 0;
 
-        var elements = Peek(elementCount: offsetIndex + 1);
+        var elements = PeekOrDequeue(
+            elementCount: offsetIndex + 1,
+            doDequeue: false);
+
         if (offsetIndex < elements.Length)
         {
             element = elements[offsetIndex];
@@ -271,9 +254,7 @@ public sealed class MemoryQueue<T> : IDisposable
     {
         lock (SyncLock)
         {
-            if (m_IsDisposed) return;
-
-            m_IsDisposed = true;
+            if (Buffer.IsDisposed) return;
             Buffer.Dispose();
         }
     }
@@ -293,9 +274,8 @@ public sealed class MemoryQueue<T> : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int PeekOrDequeue(Span<T> destination, bool doDequeue)
     {
-        const int targetOffset = 0;
         var targetCount = destination.Length;
-
+        
         lock (SyncLock)
         {
             if (targetCount > Count)
@@ -304,34 +284,39 @@ public sealed class MemoryQueue<T> : IDisposable
             if (targetCount <= 0)
                 return 0;
 
-            if (ReadHead < WriteTail)
+            // compute the number of slots that can be read from
+            // the tight side of the buffer
+            var rightSlotCount = Capacity - ReadIndex;
+
+            if (ReadIndex < WriteIndex || rightSlotCount >= targetCount)
             {
-                Buffer.CopyTo(ReadHead, destination, targetOffset, targetCount);
+                var sourceRange = ReadIndex..(ReadIndex + targetCount);
+                var targetRange = ..targetCount;
+                Buffer[sourceRange].Span.CopyTo(destination[targetRange]);
             }
             else
             {
-                var rightLength = Capacity - ReadHead;
+                // copy from the right part of the buffer
+                var sourceRange = ReadIndex..(ReadIndex + rightSlotCount);
+                var targetRange = ..rightSlotCount;
+                Buffer[sourceRange].Span.CopyTo(destination[targetRange]);
 
-                if (rightLength >= targetCount)
-                {
-                    Buffer.CopyTo(ReadHead, destination, targetOffset, targetCount);
-                }
-                else
-                {
-                    Buffer.CopyTo(ReadHead, destination, targetOffset, rightLength);
-                    Buffer.CopyTo(0, destination, targetOffset + rightLength, targetCount - rightLength);
-                }
+                // wrap around and copy from the left part of the buffer
+                var leftSlotCount = targetCount - rightSlotCount;
+                sourceRange = ..leftSlotCount;
+                targetRange = rightSlotCount..(rightSlotCount + leftSlotCount);
+                Buffer[sourceRange].Span.CopyTo(destination[targetRange]);
             }
 
             if (doDequeue)
             {
-                ReadHead = (ReadHead + targetCount) % Capacity;
+                ReadIndex = (ReadIndex + targetCount) % Capacity;
                 Count -= targetCount;
 
                 if (Count == 0)
                 {
-                    ReadHead = 0;
-                    WriteTail = 0;
+                    ReadIndex = 0;
+                    WriteIndex = 0;
                 }
             }
 
@@ -349,24 +334,34 @@ public sealed class MemoryQueue<T> : IDisposable
 
         if (Count > 0)
         {
-            if (ReadHead < WriteTail)
+            if (ReadIndex < WriteIndex)
             {
-                Buffer.CopyTo(ReadHead, newBuffer, 0, Count);
+                // we simply copy the surrent counted elements
+                var sourceRange = ReadIndex..(ReadIndex + Count);
+                var targetRange = ..Count;
+                Buffer[sourceRange].CopyTo(newBuffer[targetRange]);
             }
             else
             {
-                Buffer.CopyTo(ReadHead, newBuffer, 0, Capacity - ReadHead);
-                Buffer.CopyTo(0, newBuffer, Capacity - ReadHead, WriteTail);
+                //Buffer.CopyTo(ReadHead, newBuffer, 0, Capacity - ReadHead);
+                var rightSlotCount = Capacity - ReadIndex;
+                var sourceRange = ReadIndex..(ReadIndex + rightSlotCount);
+                var targetRange = ..rightSlotCount;
+                Buffer[sourceRange].CopyTo(newBuffer[targetRange]);
+
+                //Buffer.CopyTo(0, newBuffer, Capacity - ReadHead, WriteTail);
+                sourceRange = ..WriteIndex;
+                targetRange = rightSlotCount..(rightSlotCount + WriteIndex);
+                Buffer[sourceRange].CopyTo(newBuffer[targetRange]);
             }
         }
 
-        ReadHead = 0;
-        WriteTail = Count;
+        ReadIndex = 0;
+        WriteIndex = Count;
 
         // dispose the old buffer
-        Buffer.Dispose();
-
-        // Set the internal buffer to the newly allocated one
+        var oldBuffer = Buffer;
         Buffer = newBuffer;
+        oldBuffer.Dispose();
     }
 }

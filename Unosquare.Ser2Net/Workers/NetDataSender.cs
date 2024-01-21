@@ -3,7 +3,7 @@
 /// <summary>
 /// Reads data from <see cref="DataBridge.ToNetBuffer"/> client and sends it to the TCP connected clients.
 /// </summary>
-internal class NetDataSender : BufferWorkerBase<NetDataSender>
+internal sealed class NetDataSender : BufferWorkerBase<NetDataSender>
 {
     public NetDataSender(ILogger<NetDataSender> logger, ServiceSettings settings, DataBridge dataBridge, NetServer server)
         : base(logger, settings, dataBridge)

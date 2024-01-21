@@ -23,29 +23,12 @@ internal static class BuilderExtensions
     public static T ConfigureLifetimeAndLogging<T>(this T builder)
         where T : IHostBuilder
     {
-        if (WindowsServiceHelpers.IsWindowsService())
+        builder.ConfigureAppConfiguration((context, app) =>
         {
-            builder.UseWindowsService();
-            builder.ConfigureLogging((context, logging) =>
-            {
-                // we don't want to use the event log
-                // we will just use the file.
-                logging.ClearProviders();
-            });
-        }
-        else if (SystemdHelpers.IsSystemdService())
-        {
-            builder.UseSystemd();
-            builder.ConfigureLogging((context, logging) =>
-            {
-                logging.RemoveLoggingProvidersExcept(
-                    typeof(ConsoleLoggerProvider));
-            });
-        }
-        else
-        {
-            builder.UseConsoleLifetime();
-        }
+            context.HostingEnvironment.EnvironmentName = Debugger.IsAttached
+                ? Environments.Development
+                : Environments.Production;
+        });
 
         if (WindowsServiceHelpers.IsWindowsService())
         {
@@ -55,12 +38,13 @@ internal static class BuilderExtensions
         }
         else if (SystemdHelpers.IsSystemdService())
         {
-            builder.UseSystemd();
-            builder.ConfigureLogging((context, logging) =>
-            {
-                logging.RemoveLoggingProvidersExcept(
-                    typeof(ConsoleLoggerProvider));
-            });
+            builder
+                .UseSystemd()
+                .ConfigureLogging((context, logging) =>
+                {
+                    logging.RemoveLoggingProvidersExcept(
+                        typeof(ConsoleLoggerProvider));
+                });
         }
         else
         {
@@ -69,18 +53,43 @@ internal static class BuilderExtensions
                 .UseConsoleLifetime()
                 .ConfigureLogging((context, logging) =>
                 {
-                    var serilogLogger = new LoggerConfiguration()
-                        .WriteTo.Console()
-                        .MinimumLevel.Is(context.HostingEnvironment.IsProduction() ? Serilog.Events.LogEventLevel.Information : Serilog.Events.LogEventLevel.Debug)
-                        .CreateLogger();
+                    var serilogLevel = context.HostingEnvironment.IsProduction()
+                        ? LogEventLevel.Information
+                        : LogEventLevel.Debug;
 
-                    /*
-                     *        var serilogLogger = new LoggerConfiguration()
-            .MinimumLevel.Is(Debugger.IsAttached ? LogEventLevel.Verbose : LogEventLevel.Information)
-            .WriteTo.Async(f => f.File(@"f:\log\log.txt", rollingInterval: RollingInterval.Day))
-    .CreateLogger(); 
-                     * 
-                    */
+                    // start with basic console configuration
+                    var serilogLoggerConfig = new LoggerConfiguration()
+                        .MinimumLevel.Is(serilogLevel)
+                        .WriteTo.Console(formatProvider: CultureInfo.InvariantCulture);
+
+                    try
+                    {
+                        // attempt to configure logs
+                        var logsPath = Path.Combine(
+                            Path.GetFullPath(context.HostingEnvironment.ContentRootPath),
+                            Constants.LogsDirectoryName);
+
+                        if (!Directory.Exists(logsPath))
+                            Directory.CreateDirectory(logsPath);
+
+                        var logFileTemplate = Path.Combine(logsPath, Constants.LogsBaseFileName);
+
+                        serilogLoggerConfig
+                            .WriteTo.Async(f => f.File(
+                                logFileTemplate,
+                                rollingInterval: RollingInterval.Day,
+                                formatProvider: CultureInfo.InvariantCulture,
+                                shared: true,
+                                flushToDiskInterval: Constants.LogsFileFlushInterval,
+                                retainedFileCountLimit: Constants.LogsFileCountMax));
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+
+                    // create the serilog logger
+                    var serilogLogger = serilogLoggerConfig.CreateLogger();
 
                     // Set a global static logger
                     Log.Logger = serilogLogger;

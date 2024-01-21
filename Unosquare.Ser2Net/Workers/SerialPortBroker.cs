@@ -3,7 +3,7 @@
 /// <summary>
 /// Maintains a serial port connection and acts as a proxy to such serial port.
 /// </summary>
-internal class SerialPortBroker(ILogger<SerialPortBroker> logger, ServiceSettings settings, DataBridge dataBridge) :
+internal sealed class SerialPortBroker(ILogger<SerialPortBroker> logger, ServiceSettings settings, DataBridge dataBridge) :
     BufferWorkerBase<SerialPortBroker>(logger, settings, dataBridge)
 {
     const string LoggerName = "Serial";
@@ -13,41 +13,39 @@ internal class SerialPortBroker(ILogger<SerialPortBroker> logger, ServiceSetting
         using var readBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
         using var writeBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
         SerialPort? serialPort = null;
-        var performDelay = false;
 
         try
         {
             while (!stoppingToken.IsCancellationRequested)
             {
                 // always dequeue regardless of connection state
-                var pendingWriteCount = DataBridge.ToPortBuffer.Dequeue(writeBuffer.Span);
+                // because we don't want to fill up the queue with
+                // data when there is potentially no serial port connected
+                var pendingWriteLength = DataBridge.ToPortBuffer.Dequeue(writeBuffer);
 
-                if (performDelay)
+                // Attempt serial port connection if one is not active.
+                if (serialPort is null && !TryConnectWantedPort(out serialPort))
                 {
-                    await Task.Delay(500, stoppingToken).ConfigureAwait(false);
-                    performDelay = false;
+                    // give the loop a break. Don't go as fast as possible
+                    // retrying serial port connection so we don't peg a core
+                    // unnecessarily. Don't make the delay too long because we might
+                    // still have data being queued up.
+                    await Task.Delay(Constants.LongDelayMillisconds, stoppingToken)
+                        .ConfigureAwait(false);
+
                     continue;
-                }
-
-                if (serialPort is null)
-                {
-                    if (performDelay = !TryConnectWantedPort(out serialPort))
-                        continue;
-
-                    if (serialPort is null)
-                        continue;
                 }
 
                 try
                 {
                     // fire up the receive task
-                    var receiveTask = ReceiveSerialPortDataAsync(serialPort, readBuffer.Memory, stoppingToken);
+                    var receiveTask = ReceiveSerialPortDataAsync(serialPort, readBuffer, stoppingToken);
 
                     // send data to serial port
-                    if (pendingWriteCount > 0)
+                    if (pendingWriteLength > 0)
                     {
                         await serialPort.BaseStream
-                            .WriteAsync(writeBuffer.Memory[..pendingWriteCount], stoppingToken)
+                            .WriteAsync(writeBuffer[..pendingWriteLength], stoppingToken)
                             .ConfigureAwait(false);
                     }
 
@@ -60,9 +58,9 @@ internal class SerialPortBroker(ILogger<SerialPortBroker> logger, ServiceSetting
                 }
                 catch
                 {
-                    Logger.LogPortDisconnected(LoggerName, serialPort.PortName);
-                    serialPort.Close();
-                    serialPort.Dispose();
+                    Logger.LogPortDisconnected(LoggerName, serialPort?.PortName ?? "NOPORT");
+                    serialPort?.Close();
+                    serialPort?.Dispose();
                     serialPort = null;
                 }
             }
@@ -144,7 +142,7 @@ internal class SerialPortBroker(ILogger<SerialPortBroker> logger, ServiceSetting
         return [.. wantedPortNames];
     }
 
-    private bool TrySerialPortConnection(string portName, [MaybeNullWhen(false)] out SerialPort? port)
+    private bool TrySerialPortConnection(string portName, [NotNullWhen(true)] out SerialPort? port)
     {
         port = null;
 

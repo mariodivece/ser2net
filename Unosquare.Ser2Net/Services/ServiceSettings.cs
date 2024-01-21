@@ -1,6 +1,6 @@
 ﻿namespace Unosquare.Ser2Net.Services;
 
-internal class ServiceSettings
+internal sealed class ServiceSettings
 {
     private const string LoggerName = "Settings";
 

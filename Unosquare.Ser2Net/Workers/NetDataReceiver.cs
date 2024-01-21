@@ -3,7 +3,7 @@
 /// <summary>
 /// Reads data from all connected TCP clients and sends it to the <see cref="DataBridge.ToPortBuffer"/>.
 /// </summary>
-internal class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
+internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
 {
     public NetDataReceiver(ILogger<NetDataReceiver> logger, ServiceSettings settings, DataBridge dataBridge, NetServer server)
         : base(logger, settings, dataBridge)
