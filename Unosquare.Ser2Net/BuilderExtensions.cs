@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Hosting.Systemd;
-using Microsoft.Extensions.Hosting.WindowsServices;
-using Microsoft.Extensions.Logging.Console;
+﻿using Microsoft.Extensions.Logging.Console;
 using Serilog;
 using System.Runtime.Versioning;
 
@@ -26,10 +24,8 @@ internal static class BuilderExtensions
             .ConfigureAppConfiguration((context, config) =>
             {
                 // setup basic host environment information
-                context.HostingEnvironment.EnvironmentName = Debugger.IsAttached
-                    ? Environments.Development
-                    : Environments.Production;
-                context.HostingEnvironment.ContentRootPath = Environment.CurrentDirectory;
+                context.HostingEnvironment.EnvironmentName = Program.EnvironmentName;
+                context.HostingEnvironment.ContentRootPath = Program.WorkingDirectory;
                 context.HostingEnvironment.ApplicationName = Constants.SerivceName;
                 
                 // add the json configuration file

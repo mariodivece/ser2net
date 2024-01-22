@@ -90,6 +90,9 @@ internal sealed class MainHostedService : WorkerBase<MainHostedService>
             tasks.Add(worker.ExecuteTask!);
         }
 
-        await Task.WhenAll(tasks).ConfigureAwait(false);
+        // We use WehnAny (as opposed to WhenAll)
+        // because if a single subsystem fails, the rest
+        // of them simply won't work.
+        await Task.WhenAny(tasks).ConfigureAwait(false);
     }
 }
