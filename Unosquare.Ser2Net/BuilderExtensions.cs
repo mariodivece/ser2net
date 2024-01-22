@@ -24,9 +24,10 @@ internal static class BuilderExtensions
             .ConfigureAppConfiguration((context, config) =>
             {
                 // setup basic host environment information
-                context.HostingEnvironment.EnvironmentName = Program.EnvironmentName;
-                context.HostingEnvironment.ContentRootPath = Program.WorkingDirectory;
-                context.HostingEnvironment.ApplicationName = Constants.SerivceName;
+                var env = context.HostingEnvironment;
+                env.EnvironmentName = RuntimeContext.EnvironmentName;
+                env.ContentRootPath = RuntimeContext.ExecutableDirectory;
+                env.ApplicationName = Constants.SerivceName;
                 
                 // add the json configuration file
                 config.AddJsonFile(Constants.SettingsFilename,
@@ -66,10 +67,10 @@ internal static class BuilderExtensions
     public static T ConfigureLifetimeAndLogging<T>(this T builder)
         where T : IHostBuilder
     {
-        switch (Program.RuntimeMode)
+        switch (RuntimeContext.RuntimeMode)
         {
             case RuntimeMode.WindowsService:
-                if (Program.Platform != OSPlatform.Windows)
+                if (RuntimeContext.Platform != OSPlatform.Windows)
                     throw new PlatformNotSupportedException();
 
                 builder
