@@ -10,6 +10,8 @@ internal static class Constants
 
     public const string WindowsLogName = "Application";
 
+    public const string WindowsOS = "windows";
+
     public const int ExitCodeSuccess = 0;
 
     public const int ExitCodeFailure = 1;

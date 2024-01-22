@@ -193,7 +193,7 @@ internal static class BuilderExtensions
         return builder;
     }
 
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform(Constants.WindowsOS)]
     private static T AddWindowsEventLogging<T>(this T builder)
         where T : IHostBuilder
     {
