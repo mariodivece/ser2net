@@ -2,9 +2,11 @@
 
 internal static class Constants
 {
+    public const string SerivceKey = "unoser2net";
+
     public const string SerivceName = "Unosquare Ser2Net Service";
 
-    public const string SerivceKey = "unoser2net";
+    public const string ServiceDescription = "Performs serial port communications over TCP sockets.";
 
     public const string WindowsLogName = "Application";
 

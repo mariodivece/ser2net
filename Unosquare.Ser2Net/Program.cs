@@ -16,11 +16,27 @@ internal static class Program
     /// </returns>
     public static async Task<int> Main(string[] args)
     {
-        //await InstallWindowsServiceAsync().ConfigureAwait(false);
-        //await InstallWindowsServiceAsync().ConfigureAwait(false);
-        //return 0;
-        SampleWindowsIntallScript();
-        return 0;
+        if (args.Length > 0 && args.Any(c => c == "--install"))
+        {
+            if (RuntimeContext.RuntimeMode == RuntimeMode.Console && RuntimeContext.Platform == OSPlatform.Windows)
+            {
+                var resultCode = 1;
+                try
+                {
+                    resultCode = await InstallWindowsServiceAsync().ConfigureAwait(false);
+
+                    if (resultCode != 0)
+                        throw new InvalidOperationException("Problem running install script.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Could not install Windows service. Exit Code {resultCode}.\r\n{ex}");
+                }
+
+                return resultCode;
+            }
+        }
+
         using var cts = new CancellationTokenSource();
 
         // Here we create the host builder from scratch
@@ -42,59 +58,50 @@ internal static class Program
         // TODO: Allow for multiple serial ports/servers in config and functionally
     }
 
-    [SupportedOSPlatform("windows")]
-    private static async Task InstallWindowsServiceAsync()
+    private static async Task<int> ExecuteElevatedPowerShellScriptAsync(string scriptContents, params string[] positionalArgs)
     {
         const string ElevationVerb = "runas";
-        const string ArgumentsFormat =
-            "create {0} binpath=\"{1}\" displayname=\"{2}\" start=auto";
-        
+
+        var scriptFilePath = Path.GetTempFileName();
+        await File.WriteAllTextAsync(scriptFilePath, scriptContents)
+            .ConfigureAwait(false);
+
+        var newScriptFilePath = Path.Combine(Path.GetDirectoryName(scriptFilePath)!, $"{Path.GetFileNameWithoutExtension(scriptFilePath)}.ps1");
+        File.Move(scriptFilePath, newScriptFilePath);
+        scriptFilePath = newScriptFilePath;
+
+        var arguments = $"-ExecutionPolicy Bypass -File \"{scriptFilePath}\" " +
+            string.Join(' ', positionalArgs.Select(c => $"\"{c}\"").ToArray());
+
         using var process = new Process()
         {
             EnableRaisingEvents = true,
             StartInfo = new ProcessStartInfo()
             {
                 Verb = ElevationVerb,
-                FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "sc.exe"),
+                FileName = "PowerShell.exe",
                 CreateNoWindow = true,
                 UseShellExecute = true,
                 RedirectStandardOutput = false,
-                //RedirectStandardError = true,
-                //WindowStyle = ProcessWindowStyle.Hidden,
-                Arguments = string.Format(CultureInfo.InvariantCulture,
-                    ArgumentsFormat,
-                    Constants.SerivceKey,
-                    RuntimeContext.ExecutableFilePath,
-                    Constants.SerivceName)
+                WindowStyle = ProcessWindowStyle.Hidden,
+                Arguments = arguments
             }
         };
 
-        process.ErrorDataReceived += (sender, e) =>
-        {
-            if (string.IsNullOrWhiteSpace(e.Data))
-                return;
-
-            Console.WriteLine(e.Data);
-        };
-
-        process.OutputDataReceived += (sender, e) =>
-        {
-            if (string.IsNullOrWhiteSpace(e.Data))
-                return;
-
-            Console.WriteLine(e.Data);
-        };
-
         var started = process.Start();
-        //process.BeginOutputReadLine();
+        if (!started)
+            return 1;
+
         await process.WaitForExitAsync().ConfigureAwait(false);
-        var exitCode = process.ExitCode;
+        File.Delete(scriptFilePath);
+        return process.ExitCode;
     }
 
-    private static void SampleWindowsIntallScript()
-    {
-        
-        var script = ResourceManager.InstallScriptWindows;
-    }
-
+    [SupportedOSPlatform("windows")]
+    private static async Task<int> InstallWindowsServiceAsync() =>
+        await ExecuteElevatedPowerShellScriptAsync(ResourceManager.InstallScriptWindows,
+            Constants.SerivceKey,
+            RuntimeContext.ExecutableFilePath,
+            Constants.SerivceName,
+            Constants.ServiceDescription).ConfigureAwait(false);
 }

@@ -36,7 +36,8 @@
 
 	<ItemGroup>
 	  <None Remove="Resources\icon.ico" />
-	  <None Remove="Resources\install-win.bat" />
+	  <None Remove="Resources\install-win.ps1" />
+	  <None Remove="Resources\remove-win.ps1" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -49,7 +50,8 @@
 
 	<ItemGroup>
 	  <EmbeddedResource Include="Resources\icon.ico" />
-	  <EmbeddedResource Include="Resources\install-win.bat" />
+	  <EmbeddedResource Include="Resources\remove-win.ps1" />
+	  <EmbeddedResource Include="Resources\install-win.ps1" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -76,7 +78,6 @@
 		<PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
 		<PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
 		<PackageReference Include="System.IO.Ports" Version="8.0.0" />
-		<PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
 	</ItemGroup>
 
 </Project>

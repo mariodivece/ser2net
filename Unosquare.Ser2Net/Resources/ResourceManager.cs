@@ -5,7 +5,7 @@ namespace Unosquare.Ser2Net.Resources;
 
 internal static class ResourceManager
 {
-    private static readonly Lazy<string> installScriptWindows = new(() => ReadString("install-win.bat"), isThreadSafe: false);
+    private static readonly Lazy<string> installScriptWindows = new(() => ReadString("install-win.ps1"), isThreadSafe: false);
 
     private static string ReadString(string resourceName)
     {
