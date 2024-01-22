@@ -16,26 +16,37 @@ internal static class Program
     /// </returns>
     public static async Task<int> Main(string[] args)
     {
-        if (args.Length > 0 && args.Any(c => c == "--install"))
+        if (args.Length > 0)
         {
-            if (RuntimeContext.RuntimeMode == RuntimeMode.Console && RuntimeContext.Platform == OSPlatform.Windows)
+            var resultCode = 1;
+            try
             {
-                var resultCode = 1;
-                try
-                {
-                    resultCode = await InstallWindowsServiceAsync().ConfigureAwait(false);
+                if (RuntimeContext.RuntimeMode != RuntimeMode.Console)
+                    throw new InvalidOperationException("Argument is only valid when issued from a console.");
 
-                    if (resultCode != 0)
-                        throw new InvalidOperationException("Problem running install script.");
-                }
-                catch (Exception ex)
+                if (args.Any(c => c == "--install"))
                 {
-                    Console.WriteLine($"Could not install Windows service. Exit Code {resultCode}.\r\n{ex}");
+                    if (RuntimeContext.Platform == OSPlatform.Windows)
+                        resultCode = await InstallWindowsServiceAsync().ConfigureAwait(false);
+                    else
+                        throw new PlatformNotSupportedException("Your current platform does not support this action.");
                 }
-
-                return resultCode;
+                else if (args.Any(c => c == "--remove"))
+                {
+                    if (RuntimeContext.Platform == OSPlatform.Windows)
+                        resultCode = await RemoveWindowsServiceAsync().ConfigureAwait(false);
+                    else
+                        throw new PlatformNotSupportedException("Your current platform does not support this action.");
+                }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Could not perform requested action. Exit Code: {resultCode}.\r\n{ex}");
+            }
+
+            return resultCode;
         }
+
 
         using var cts = new CancellationTokenSource();
 
@@ -100,8 +111,15 @@ internal static class Program
     [SupportedOSPlatform("windows")]
     private static async Task<int> InstallWindowsServiceAsync() =>
         await ExecuteElevatedPowerShellScriptAsync(ResourceManager.InstallScriptWindows,
+            "i",
             Constants.SerivceKey,
             RuntimeContext.ExecutableFilePath,
             Constants.SerivceName,
             Constants.ServiceDescription).ConfigureAwait(false);
+
+    [SupportedOSPlatform("windows")]
+    private static async Task<int> RemoveWindowsServiceAsync() =>
+        await ExecuteElevatedPowerShellScriptAsync(ResourceManager.InstallScriptWindows,
+            "u",
+            Constants.SerivceKey).ConfigureAwait(false);
 }

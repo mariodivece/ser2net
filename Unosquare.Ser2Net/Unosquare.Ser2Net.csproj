@@ -7,10 +7,7 @@
 		<LangVersion>latest</LangVersion>
 		<OutputType>exe</OutputType>
 		<AssemblyName>unoser2net</AssemblyName>
-		<Version>2024.1.21-b3</Version>
-		<PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
-		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
-		<PlatformTarget>x64</PlatformTarget>
+		<Version>2024.1.22-b4</Version>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<PublishAot>true</PublishAot>
 		<AnalysisMode>all</AnalysisMode>
@@ -37,7 +34,6 @@
 	<ItemGroup>
 	  <None Remove="Resources\icon.ico" />
 	  <None Remove="Resources\install-win.ps1" />
-	  <None Remove="Resources\remove-win.ps1" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -50,7 +46,6 @@
 
 	<ItemGroup>
 	  <EmbeddedResource Include="Resources\icon.ico" />
-	  <EmbeddedResource Include="Resources\remove-win.ps1" />
 	  <EmbeddedResource Include="Resources\install-win.ps1" />
 	</ItemGroup>
 

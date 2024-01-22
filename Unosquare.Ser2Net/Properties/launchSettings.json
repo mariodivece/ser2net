@@ -1,8 +1,7 @@
 {
   "profiles": {
     "Unosquare.Ser2Net": {
-      "commandName": "Project",
-      "commandLineArgs": "--install"
+      "commandName": "Project"
     }
   }
 }
