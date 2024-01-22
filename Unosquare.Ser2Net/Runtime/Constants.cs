@@ -1,4 +1,4 @@
-﻿namespace Unosquare.Ser2Net;
+﻿namespace Unosquare.Ser2Net.Runtime;
 
 internal static class Constants
 {

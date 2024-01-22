@@ -12,6 +12,6 @@ global using System.Net.Sockets;
 global using System.Runtime.CompilerServices;
 global using System.Runtime.InteropServices;
 global using Unosquare.Ser2Net.Memory;
+global using Unosquare.Ser2Net.Runtime;
 global using Unosquare.Ser2Net.Services;
 global using Unosquare.Ser2Net.Workers;
-global using Unosquare.Ser2Net.Resources;

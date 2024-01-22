@@ -64,7 +64,7 @@ internal static class Program
         await host.RunAsync(cts.Token).ConfigureAwait(false);
         return Environment.ExitCode;
 
-        // TODO: args install/reinstall and uninstall
+        // TODO: args install/reinstall and uninstall on Linux also (systemd)
         // TODO: Log current settings on startup
         // TODO: Allow for multiple serial ports/servers in config and functionally
     }

@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.Text;
 
-namespace Unosquare.Ser2Net.Resources;
+namespace Unosquare.Ser2Net.Runtime;
 
 internal static class ResourceManager
 {

@@ -1,5 +1,6 @@
 ﻿namespace Unosquare.Ser2Net.Services;
 
+using Unosquare.Ser2Net.Runtime;
 using DataQueue = MemoryQueue<byte>;
 
 /// <summary>

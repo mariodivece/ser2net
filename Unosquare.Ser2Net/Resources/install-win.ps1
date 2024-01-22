@@ -1,3 +1,4 @@
+# Install and Remove Windows Service script.
 # powershell -executionpolicy bypass -file .\script.ps1 arg0 arg1
 
 # runMode
@@ -8,6 +9,7 @@
 $runMode            = $(if ($args.Length -gt 0) { $args[0] } else { throw "Missing argument 0 corresponding to run mode";             exit 1; })
 $serviceKey         = $(if ($args.Length -gt 1) { $args[1] } else { throw "Missing argument 1 corresponding to service key";          exit 1; })
 
+# For runMode = i (install), we need additional arguments
 if ($runMode -eq "i")
 {
     $servicePath        = $(if ($args.Length -gt 2) { $args[2] } else { throw "Missing argument 2 corresponding to service path";         exit 1; })

@@ -2,7 +2,7 @@
 using Serilog;
 using System.Runtime.Versioning;
 
-namespace Unosquare.Ser2Net;
+namespace Unosquare.Ser2Net.Runtime;
 
 /// <summary>
 /// Host builder extension methods.
@@ -28,7 +28,7 @@ internal static class BuilderExtensions
                 env.EnvironmentName = RuntimeContext.EnvironmentName;
                 env.ContentRootPath = RuntimeContext.ExecutableDirectory;
                 env.ApplicationName = Constants.SerivceName;
-                
+
                 // add the json configuration file
                 config.AddJsonFile(Constants.SettingsFilename,
                     optional: true,
