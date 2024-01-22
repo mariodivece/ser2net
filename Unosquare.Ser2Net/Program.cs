@@ -39,6 +39,7 @@ internal static class Program
         //}
 
         await InstallWindowsServiceAsync().ConfigureAwait(false);
+        await InstallWindowsServiceAsync().ConfigureAwait(false);
         return 0;
 
         using var cts = new CancellationTokenSource();
@@ -97,10 +98,10 @@ internal static class Program
             {
                 Verb = ElevationVerb,
                 FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "sc.exe"),
-                //CreateNoWindow = true,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
+                CreateNoWindow = true,
+                UseShellExecute = true,
+                RedirectStandardOutput = false,
+                //RedirectStandardError = true,
                 //WindowStyle = ProcessWindowStyle.Hidden,
                 Arguments = string.Format(CultureInfo.InvariantCulture,
                     ArgumentsFormat,
@@ -127,7 +128,7 @@ internal static class Program
         };
 
         var started = process.Start();
-        process.BeginOutputReadLine();
+        //process.BeginOutputReadLine();
         await process.WaitForExitAsync().ConfigureAwait(false);
         var exitCode = process.ExitCode;
     }
