@@ -1,4 +1,7 @@
-﻿namespace Unosquare.Ser2Net.Runtime;
+﻿using Microsoft.Extensions.Primitives;
+using System.Text;
+
+namespace Unosquare.Ser2Net.Runtime;
 
 /// <summary>
 /// Exception for signalling service installer errors.
@@ -18,7 +21,7 @@ public class ServiceInstallerException : Exception
     public ServiceInstallerException()
         : base(UnkownErrorMessage)
     {
-        ResultCode = DefaultErrorCode;
+        ErrorCode = DefaultErrorCode;
     }
 
     /// <summary>
@@ -28,13 +31,13 @@ public class ServiceInstallerException : Exception
     public ServiceInstallerException(int errorCode)
         : base(UnkownErrorMessage)
     {
-        ResultCode = errorCode;
+        ErrorCode = errorCode;
     }
 
     public ServiceInstallerException(int errorCode, Exception innerException)
         : base(UnkownErrorMessage, innerException)
     {
-        ResultCode = errorCode;
+        ErrorCode = errorCode;
     }
 
     /// <summary>
@@ -44,7 +47,7 @@ public class ServiceInstallerException : Exception
     public ServiceInstallerException(Exception innerException)
         : base(UnkownErrorMessage, innerException)
     {
-        ResultCode = DefaultErrorCode;
+        ErrorCode = DefaultErrorCode;
     }
 
     /// <summary>
@@ -55,7 +58,7 @@ public class ServiceInstallerException : Exception
     public ServiceInstallerException(int errorCode, string message)
         : base(message)
     {
-        ResultCode = errorCode;
+        ErrorCode = errorCode;
     }
 
     /// <summary>
@@ -77,7 +80,7 @@ public class ServiceInstallerException : Exception
     public ServiceInstallerException(int errorCode, string message, Exception innerException)
         : base(message, innerException)
     {
-        ResultCode = errorCode;
+        ErrorCode = errorCode;
     }
 
     /// <summary>
@@ -94,7 +97,28 @@ public class ServiceInstallerException : Exception
     /// <summary>
     /// Gets the result code.
     /// </summary>
-    public int ResultCode { get; } = DefaultErrorCode;
+    public int ErrorCode { get; } = DefaultErrorCode;
 
 
+    public static ServiceInstallerException InvalidArgument() => new(22, "Invalid argument.");
+
+    public static ServiceInstallerException InvalidRuntimeMode() => new(44, "Argument is only valid when issued from the console.");
+
+    public static ServiceInstallerException GeneralFailure(Exception innerException) => new(64, "Could not perform requested action.", innerException);
+
+    public string ToString(bool addDetails)
+    {
+        var builder = new StringBuilder($"Error Code {ErrorCode}: {Message}");
+        if (!addDetails)
+            return builder.ToString();
+            
+
+        if (InnerException is not null)
+            builder.Append(CultureInfo.InvariantCulture, $"\r\n    ({InnerException.GetType().Name}): {InnerException.Message}");
+
+        if (!string.IsNullOrWhiteSpace(StackTrace))
+            builder.Append(CultureInfo.InvariantCulture, $"\r\n Stack Trace follows:\r\n{StackTrace}");
+
+        return builder.ToString();
+    }
 }

@@ -2,7 +2,6 @@
 
 internal static class RuntimeContext
 {
-
     public static RuntimeMode RuntimeMode { get; } = WindowsServiceHelpers.IsWindowsService()
         ? RuntimeMode.WindowsService
         : SystemdHelpers.IsSystemdService()
@@ -22,4 +21,8 @@ internal static class RuntimeContext
     public static string EnvironmentName { get; } = Debugger.IsAttached
         ? Environments.Development
         : Environments.Production;
+
+    public static bool IsProduction => EnvironmentName.Equals(Environments.Production, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsDevelopment => EnvironmentName.Equals(Environments.Development, StringComparison.OrdinalIgnoreCase);
 }
