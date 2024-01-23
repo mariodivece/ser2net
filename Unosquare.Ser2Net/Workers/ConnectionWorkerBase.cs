@@ -1,9 +1,9 @@
 ﻿namespace Unosquare.Ser2Net.Workers;
 
-internal abstract class WorkerBase<T> : BackgroundService
+internal abstract class ConnectionWorkerBase<T> : BackgroundService
     where T : BackgroundService
 {
-    protected WorkerBase(ILogger<T> logger, ServiceSettings settings)
+    protected ConnectionWorkerBase(ILogger<T> logger, ConnectionSettingsItem settings)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(settings);
@@ -14,5 +14,5 @@ internal abstract class WorkerBase<T> : BackgroundService
 
     protected ILogger<T> Logger { get; }
 
-    protected ServiceSettings Settings { get; }
+    protected ConnectionSettingsItem Settings { get; }
 }

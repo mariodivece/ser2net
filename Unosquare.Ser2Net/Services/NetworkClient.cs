@@ -14,7 +14,7 @@ internal sealed class NetworkClient : IDisposable
     private bool _IsConnected = true;
     private readonly SemaphoreSlim AsyncRoot = new(1, 1);
 
-    public NetworkClient(ILogger<NetworkClient> logger, ServiceSettings settings, Socket socket)
+    public NetworkClient(ILogger<NetworkClient> logger, ConnectionSettingsItem settings, Socket socket)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(socket);
@@ -69,7 +69,7 @@ internal sealed class NetworkClient : IDisposable
 
     private ILogger<NetworkClient> Logger { get; }
 
-    private ServiceSettings Settings { get; }
+    private ConnectionSettingsItem Settings { get; }
 
     public async ValueTask SendAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

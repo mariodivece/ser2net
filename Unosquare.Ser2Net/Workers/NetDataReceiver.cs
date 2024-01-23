@@ -5,7 +5,7 @@
 /// </summary>
 internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
 {
-    public NetDataReceiver(ILogger<NetDataReceiver> logger, ServiceSettings settings, DataBridge dataBridge, NetServer server)
+    public NetDataReceiver(ILogger<NetDataReceiver> logger, ConnectionSettingsItem settings, DataBridge dataBridge, NetServer server)
         : base(logger, settings, dataBridge)
     {
         ArgumentNullException.ThrowIfNull(server);

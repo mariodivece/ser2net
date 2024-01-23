@@ -1,50 +1,53 @@
 ﻿namespace Unosquare.Ser2Net.Services;
 
-internal sealed class ServiceSettings
+internal sealed class ConnectionSettingsItem : IConnectionIndex
 {
     private const string LoggerName = "Settings";
 
-    public ServiceSettings(IConfiguration configuration, ILogger<ServiceSettings> logger)
+    public ConnectionSettingsItem(
+        int connectionIndex,
+        IConfigurationSection configuration,
+        ILogger<ConnectionSettings> logger)
     {
-        Logger = logger;
+        ConnectionIndex = connectionIndex;
 
         if (TryRead<IPAddress>(configuration, nameof(ServerIP), out var serverIP))
             ServerIP = serverIP;
         else
-            Logger.LogDefaultSetting(LoggerName, nameof(ServerIP), ServerIP.ToString());
+            logger.LogDefaultSetting(LoggerName, nameof(ServerIP), ServerIP.ToString());
 
         if (TryRead<int>(configuration, nameof(ServerPort), out var serverPort))
             ServerPort = serverPort;
         else
-            Logger.LogDefaultSetting(LoggerName, nameof(ServerPort), ServerPort.ToString(CultureInfo.InvariantCulture));
+            logger.LogDefaultSetting(LoggerName, nameof(ServerPort), ServerPort.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<string>(configuration, nameof(PortName), out var portName))
             PortName = portName;
         else
-            Logger.LogDefaultSetting(LoggerName, nameof(PortName), PortName);
+            logger.LogDefaultSetting(LoggerName, nameof(PortName), PortName);
 
         if (TryRead<int>(configuration, nameof(BaudRate), out var baudRate))
             BaudRate = baudRate;
         else
-            Logger.LogDefaultSetting(LoggerName, nameof(BaudRate), BaudRate.ToString(CultureInfo.InvariantCulture));
+            logger.LogDefaultSetting(LoggerName, nameof(BaudRate), BaudRate.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<int>(configuration, nameof(DataBits), out var dataBits))
             DataBits = dataBits;
         else
-            Logger.LogDefaultSetting(LoggerName, nameof(DataBits), DataBits.ToString(CultureInfo.InvariantCulture));
+            logger.LogDefaultSetting(LoggerName, nameof(DataBits), DataBits.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<StopBits>(configuration, nameof(StopBits), out var stopBits))
             StopBits = stopBits;
         else
-            Logger.LogDefaultSetting(LoggerName, nameof(StopBits), StopBits.ToString());
+            logger.LogDefaultSetting(LoggerName, nameof(StopBits), StopBits.ToString());
 
         if (TryRead<Parity>(configuration, nameof(Parity), out var parity))
             Parity = parity;
         else
-            Logger.LogDefaultSetting(LoggerName, nameof(Parity), Parity.ToString());
+            logger.LogDefaultSetting(LoggerName, nameof(Parity), Parity.ToString());
     }
 
-    private ILogger<ServiceSettings> Logger { get; }
+    public int ConnectionIndex { get; }
 
     public IPAddress ServerIP { get; set; } = IPAddress.Any;
 
@@ -72,7 +75,7 @@ internal sealed class ServiceSettings
     private static bool TryRead<T>(IConfiguration configuration, string name, [MaybeNullWhen(false)] out T value)
     {
         value = default;
-        var stringValue = configuration.GetSection(nameof(ServiceSettings))[name];
+        var stringValue = configuration[name];
 
         if (stringValue is null)
             return false;

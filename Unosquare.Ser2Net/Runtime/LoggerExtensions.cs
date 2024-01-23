@@ -3,10 +3,16 @@
 internal static partial class LoggerExtensions
 {
     [LoggerMessage(LogLevel.Information, "[{Source}] Service is starting . . .")]
-    internal static partial void LogServiceStarting(this ILogger<MainHostedService> logger, string source);
+    internal static partial void LogServiceStarting(this ILogger<MainService> logger, string source);
 
     [LoggerMessage(LogLevel.Critical, "[{Source}] Service exited because of an unhandled exception")]
-    internal static partial void LogServiceError(this ILogger<MainHostedService> logger, string source, Exception ex);
+    internal static partial void LogServiceError(this ILogger<MainService> logger, string source, Exception ex);
+
+    [LoggerMessage(LogLevel.Information, "[Connection][{ConnectionIndex}] Starting . . .")]
+    internal static partial void LogConnectionStarting(this ILogger<ConnectionProxy> logger, int connectionIndex);
+
+    [LoggerMessage(LogLevel.Critical, "[Connection][{ConnectionIndex}] Terminated because of an unhandled exception.")]
+    internal static partial void LogConnectionError(this ILogger<ConnectionProxy> logger, int connectionIndex, Exception ex);
 
     [LoggerMessage(LogLevel.Information, "[{Source}] Listening for connections on [{EndPoint}].")]
     internal static partial void LogListenerStarted(this ILogger<NetServer> logger, string source, EndPoint endPoint);
@@ -39,8 +45,7 @@ internal static partial class LoggerExtensions
     internal static partial void LogClientDisconnected(this ILogger<NetworkClient> logger, string source, EndPoint endPoint);
 
     [LoggerMessage(LogLevel.Warning, "[{Source}] Could not parse setting '{Name}'. Will use default value '{Value}'")]
-    internal static partial void LogDefaultSetting(this ILogger<ServiceSettings> logger, string source, string name, string? value);
-
+    internal static partial void LogDefaultSetting(this ILogger<ConnectionSettings> logger, string source, string name, string? value);
 
     [LoggerMessage(LogLevel.Information, "[{Source}] {PortName} disconnected.")]
     internal static partial void LogPortDisconnected(this ILogger<SerialPortBroker> logger, string source, string portName);

@@ -104,7 +104,7 @@ internal static class BuilderExtensions
     }
 
     /// <summary>
-    /// Configures and adds the <see cref="MainHostedService"/> service to the host builder
+    /// Configures and adds the <see cref="ConnectionProxy"/> service to the host builder
     /// and all of its dependencies.
     /// </summary>
     /// <typeparam name="T">Generic type parameter.</typeparam>
@@ -118,16 +118,48 @@ internal static class BuilderExtensions
         builder.ConfigureServices(services =>
         {
             services
-                .AddHostedService<MainHostedService>()
-                .AddSingleton<ServiceSettings>()
-                .AddSingleton<DataBridge>()
-                .AddSingleton<NetServer>()
-                .AddSingleton<NetDataReceiver>()
-                .AddSingleton<NetDataSender>()
-                .AddSingleton<SerialPortBroker>();
+                .AddHostedService<MainService>()
+                .AddSingleton<ConnectionSettings>();
+
+            //    .AddSingleton<DataBridge>()
+            //    .AddSingleton<NetServer>()
+            //    .AddSingleton<NetDataReceiver>()
+            //    .AddSingleton<NetDataSender>()
+            //    .AddSingleton<SerialPortBroker>();
         });
 
         return builder;
+    }
+
+    public static async Task RunChildWorkersAsync(
+        this IParentBackgroundService parent,
+        CancellationToken stoppingToken)
+    {
+        ArgumentNullException.ThrowIfNull(parent);
+        if (parent.Children is null || parent.Children.Count == 0)
+            return;
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var children = parent.Children;
+
+        var tasks = new List<Task>(children.Count);
+        foreach (var worker in children)
+        {
+            if (worker is null)
+                continue;
+
+            _ = worker.StartAsync(cts.Token);
+            tasks.Add(worker.ExecuteTask!);
+        }
+
+        // We use WehnAny (as opposed to WhenAll)
+        // because if a single subsystem fails, the rest
+        // of them simply won't work.
+        await Task.WhenAny(tasks).ConfigureAwait(false);
+
+        cts.CancelAfter(1000);
+        var stopTasks = children.Select(c => c.StopAsync(cts.Token)).ToArray();
+        await Task.WhenAll(stopTasks).ConfigureAwait(false);
     }
 
     private static T AddSerilogLogging<T>(this T builder, bool useConsole, bool useFiles)

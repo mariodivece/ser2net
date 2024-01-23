@@ -1,13 +1,13 @@
 ﻿namespace Unosquare.Ser2Net.Workers;
 
-internal sealed class NetServer : WorkerBase<NetServer>
+internal sealed class NetServer : ConnectionWorkerBase<NetServer>
 {
     private const string LoggerName = "TCP";
     private int ClientId;
     private readonly ConcurrentDictionary<int, NetworkClient> m_Clients = new();
 
     public NetServer(ILogger<NetServer> logger,
-        ServiceSettings settings,
+        ConnectionSettingsItem settings,
         IServiceProvider services)
         : base(logger, settings)
     {
@@ -52,7 +52,7 @@ internal sealed class NetServer : WorkerBase<NetServer>
                 try
                 {
                     var socket = await tcpServer.AcceptSocketAsync(stoppingToken).ConfigureAwait(false);
-                    var client = ActivatorUtilities.CreateInstance<NetworkClient>(Services, socket);
+                    var client = ActivatorUtilities.CreateInstance<NetworkClient>(Services, Settings, socket);
 
                     Logger.LogClientAccepted(LoggerName, client.RemoteEndPoint);
 
