@@ -2,7 +2,7 @@
 
 internal static class CommandLine
 {
-    public static async Task<int?> HandleCommandLineArgumentsAsync(string[] args)
+    public static async Task<int?> HandleArgumentsAsync(string[] args)
     {
         if (args is null || args.Length <= 0)
             return null;

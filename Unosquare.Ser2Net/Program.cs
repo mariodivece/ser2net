@@ -1,6 +1,4 @@
-﻿using System.Runtime.Versioning;
-
-namespace Unosquare.Ser2Net;
+﻿namespace Unosquare.Ser2Net;
 
 /// <summary>
 /// The program holding the man entry point of the application.
@@ -17,9 +15,10 @@ internal static class Program
     public static async Task<int> Main(string[] args)
     {
         // Handle the special case where command-line arguments were issued.
-        var resultCode = await CommandLine.HandleCommandLineArgumentsAsync(args)
+        var resultCode = await CommandLine.HandleArgumentsAsync(args)
             .ConfigureAwait(false);
         
+        // the result code is null if no handling was performed.
         if (resultCode is not null)
         {
             Environment.ExitCode = resultCode.Value;
