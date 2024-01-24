@@ -3,10 +3,10 @@
 internal static partial class LoggerExtensions
 {
     [LoggerMessage(LogLevel.Information, "[{Source}] Service is starting . . .")]
-    internal static partial void LogServiceStarting(this ILogger<MainService> logger, string source);
+    internal static partial void LogServiceStarting(this ILogger<RootWorkerService> logger, string source);
 
     [LoggerMessage(LogLevel.Critical, "[{Source}] Service exited because of an unhandled exception")]
-    internal static partial void LogServiceError(this ILogger<MainService> logger, string source, Exception ex);
+    internal static partial void LogServiceError(this ILogger<RootWorkerService> logger, string source, Exception ex);
 
     [LoggerMessage(LogLevel.Information, "[Connection][{ConnectionIndex}] Starting . . .")]
     internal static partial void LogConnectionStarting(this ILogger<ConnectionProxy> logger, int connectionIndex);

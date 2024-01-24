@@ -3,7 +3,10 @@
 /// <summary>
 /// Maintains a serial port connection and acts as a proxy to such serial port.
 /// </summary>
-internal sealed class SerialPortBroker(ILogger<SerialPortBroker> logger, ConnectionSettingsItem settings, DataBridge dataBridge) :
+internal sealed class SerialPortBroker(
+    ILogger<SerialPortBroker> logger,
+    ConnectionSettingsItem settings,
+    DataBridge dataBridge) :
     BufferWorkerBase<SerialPortBroker>(logger, settings, dataBridge)
 {
     const string LoggerName = "Serial";

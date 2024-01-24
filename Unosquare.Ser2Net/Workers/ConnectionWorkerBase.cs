@@ -14,5 +14,5 @@ internal abstract class ConnectionWorkerBase<T> : BackgroundService
 
     protected ILogger<T> Logger { get; }
 
-    protected ConnectionSettingsItem Settings { get; }
+    public ConnectionSettingsItem Settings { get; }
 }

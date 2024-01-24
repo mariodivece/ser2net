@@ -1,12 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace Unosquare.Ser2Net.Workers;
 
-namespace Unosquare.Ser2Net.Workers;
 
+/// <summary>
+/// Interface for a <see cref="BackgroundService"/>
+/// that has one or more child <see cref="BackgroundService"/>.
+/// </summary>
 internal interface IParentBackgroundService
 {
+
+    /// <summary>
+    /// Gets the registered children background services.
+    /// </summary>
     IReadOnlyList<BackgroundService> Children { get; }
 }

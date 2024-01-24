@@ -2,7 +2,7 @@
 
 /// <summary>
 /// A <see cref="IHostedService"/> implementation representing a single serial to
-/// TCP connection orchestrator.
+/// TCP connection connection proxy.
 /// </summary>
 internal sealed class ConnectionProxy
     : ConnectionWorkerBase<ConnectionProxy>, IParentBackgroundService, IConnectionIndex
@@ -13,19 +13,25 @@ internal sealed class ConnectionProxy
     /// Initializes a new instance of the <see cref="ConnectionProxy"/> class.
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
-    public ConnectionProxy(MainService mainService, ConnectionSettingsItem settings)
-        : base(mainService.LoggerFactory.CreateLogger<ConnectionProxy>(), settings)
+    public ConnectionProxy(
+        ILogger<ConnectionProxy> logger,
+        IServiceProvider services,
+        RootWorkerService parent,
+        ConnectionSettingsItem settings)
+        : base(logger, settings)
     {
-        ArgumentNullException.ThrowIfNull(mainService);
-        Parent = mainService;
-        ConnectionIndex = settings.ConnectionIndex;
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(parent);
+
+        DataBridge = new();
+        Services = services;
+        Parent = parent;
 
         // Create the services
-        var log = Parent.LoggerFactory;
-        NetServer = new(log.CreateLogger<NetServer>(), Settings, Parent.ServiceProvider);
-        NetDataSender = new(log.CreateLogger<NetDataSender>(), Settings, DataBridge, NetServer);
-        NetDataReceiver = new(log.CreateLogger<NetDataReceiver>(), Settings, DataBridge, NetServer);
-        SerialPortBroker = new(log.CreateLogger<SerialPortBroker>(), Settings, DataBridge);
+        NetServer = Services.CreateInstance<NetServer>(Settings);
+        NetDataSender = Services.CreateInstance<NetDataSender>(NetServer, DataBridge);
+        NetDataReceiver = Services.CreateInstance<NetDataReceiver>(NetServer, DataBridge);
+        SerialPortBroker = Services.CreateInstance<SerialPortBroker>(Settings, DataBridge);
 
         // register the services as children
         _children.AddRange([
@@ -35,15 +41,17 @@ internal sealed class ConnectionProxy
             SerialPortBroker]);
     }
 
-    public int ConnectionIndex { get; }
+    IReadOnlyList<BackgroundService> IParentBackgroundService.Children => _children;
 
-    public IReadOnlyList<BackgroundService> Children => _children;
+    public int ConnectionIndex => Settings.ConnectionIndex;
 
-    private MainService Parent { get; }
-
-    private DataBridge DataBridge { get; } = new();
+    public DataBridge DataBridge { get; }
 
     private NetServer NetServer { get; }
+
+    private IServiceProvider Services { get; }
+
+    private RootWorkerService Parent { get; }
 
     private NetDataSender NetDataSender { get; }
 
@@ -75,5 +83,15 @@ internal sealed class ConnectionProxy
             // signal cancellation for remaining tasks
             await cts.CancelAsync().ConfigureAwait(false);
         }
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        DataBridge.Dispose();
+        SerialPortBroker.Dispose();
+        NetDataReceiver.Dispose();
+        NetDataSender.Dispose();
+        NetServer.Dispose();
     }
 }

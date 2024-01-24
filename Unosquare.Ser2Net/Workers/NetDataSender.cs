@@ -5,8 +5,11 @@
 /// </summary>
 internal sealed class NetDataSender : BufferWorkerBase<NetDataSender>
 {
-    public NetDataSender(ILogger<NetDataSender> logger, ConnectionSettingsItem settings, DataBridge dataBridge, NetServer server)
-        : base(logger, settings, dataBridge)
+    public NetDataSender(
+        ILogger<NetDataSender> logger,
+        NetServer server,
+        DataBridge dataBridge)
+        : base(logger, server.Settings, dataBridge)
     {
         ArgumentNullException.ThrowIfNull(server);
 

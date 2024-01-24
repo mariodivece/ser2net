@@ -1,6 +1,5 @@
 ﻿namespace Unosquare.Ser2Net.Services;
 
-
 /// <summary>
 /// A network client that can send and receive data using TCP sockets.
 /// This class cannot be inherited.
@@ -14,7 +13,10 @@ internal sealed class NetworkClient : IDisposable
     private bool _IsConnected = true;
     private readonly SemaphoreSlim AsyncRoot = new(1, 1);
 
-    public NetworkClient(ILogger<NetworkClient> logger, ConnectionSettingsItem settings, Socket socket)
+    public NetworkClient(
+        ILogger<NetworkClient> logger,
+        ConnectionSettingsItem settings,
+        Socket socket)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(socket);
