@@ -3,7 +3,6 @@
 internal sealed class NetServer
     : ConnectionWorkerBase<NetServer>
 {
-    private const string LoggerName = "TCP";
     private int ClientId;
     private readonly ConcurrentDictionary<int, NetworkClient> m_Clients = new();
 
@@ -47,7 +46,7 @@ internal sealed class NetServer
             tcpServer = new TcpListener(Settings.ServerIP, Settings.ServerPort);
             tcpServer.Start();
 
-            Logger.LogListenerStarted(LoggerName, tcpServer.LocalEndpoint);
+            Logger.LogListenerStarted(ConnectionIndex, tcpServer.LocalEndpoint);
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -56,11 +55,11 @@ internal sealed class NetServer
                     var socket = await tcpServer.AcceptSocketAsync(stoppingToken).ConfigureAwait(false);
                     var client = Services.CreateInstance<NetworkClient>(Settings, socket);
 
-                    Logger.LogClientAccepted(LoggerName, client.RemoteEndPoint);
+                    Logger.LogClientAccepted(ConnectionIndex, client.RemoteEndPoint);
 
                     if (m_Clients.Count >= Constants.MaxClientCount)
                     {
-                        Logger.LogConnectionRejectedMax(LoggerName, client.RemoteEndPoint, Constants.MaxClientCount);
+                        Logger.LogConnectionRejectedMax(ConnectionIndex, client.RemoteEndPoint, Constants.MaxClientCount);
                         client.Dispose();
                         client = null;
                         continue;
@@ -68,7 +67,7 @@ internal sealed class NetServer
 
                     if (!client.IsConnected)
                     {
-                        Logger.LogConnectionNotCompleted(LoggerName, client.RemoteEndPoint);
+                        Logger.LogConnectionNotCompleted(ConnectionIndex, client.RemoteEndPoint);
                         client.Dispose();
                         continue;
                     }
@@ -84,19 +83,19 @@ internal sealed class NetServer
                 catch (Exception ex)
                 {
                     // unhandled exception
-                    Logger.LogListenerLoopFailed(LoggerName, tcpServer?.LocalEndpoint, ex.Message, ex);
+                    Logger.LogListenerLoopFailed(ConnectionIndex, tcpServer?.LocalEndpoint, ex.Message, ex);
                     throw;
                 }
             }
         }
         catch (Exception ex)
         {
-            Logger.LogListenerFailed(LoggerName, tcpServer?.LocalEndpoint, ex.Message, ex);
+            Logger.LogListenerFailed(ConnectionIndex, tcpServer?.LocalEndpoint, ex.Message, ex);
             throw;
         }
         finally
         {
-            Logger.LogListenerShuttingDown(LoggerName, tcpServer?.LocalEndpoint);
+            Logger.LogListenerShuttingDown(ConnectionIndex, tcpServer?.LocalEndpoint);
             tcpServer?.Stop();
             tcpServer?.Dispose();
 

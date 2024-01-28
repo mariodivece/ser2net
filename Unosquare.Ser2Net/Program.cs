@@ -18,12 +18,10 @@ internal static class Program
         var resultCode = await CommandLine.HandleArgumentsAsync(args)
             .ConfigureAwait(false);
         
-        // the result code is null if no handling was performed.
+        // the result code is null if no handling was performed
+        // and we proceed to hosting the service.
         if (resultCode is not null)
-        {
-            Environment.ExitCode = resultCode.Value;
             return resultCode.Value;
-        }
 
         using var cts = new CancellationTokenSource();
 

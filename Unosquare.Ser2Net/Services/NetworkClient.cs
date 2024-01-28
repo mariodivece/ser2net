@@ -1,13 +1,11 @@
 ﻿namespace Unosquare.Ser2Net.Services;
 
 /// <summary>
-/// A network client that can send and receive data using TCP sockets.
+/// A network client that can send and receive data using a TCP socket.
 /// This class cannot be inherited.
 /// </summary>
-internal sealed class NetworkClient : IDisposable
+internal sealed class NetworkClient : IDisposable, IConnectionIndex
 {
-    const string LoggerName = "TCP";
-
     private readonly MemoryBlock<byte> ReadBuffer;
     private long _IsDisposed;
     private bool _IsConnected = true;
@@ -35,6 +33,8 @@ internal sealed class NetworkClient : IDisposable
         NetSocket.Blocking = false;
         RemoteEndPoint = NetSocket.RemoteEndPoint ?? Constants.EmptyEndPoint;
     }
+
+    public int ConnectionIndex => Settings.ConnectionIndex;
 
     public EndPoint RemoteEndPoint { get; }
 
@@ -102,7 +102,7 @@ internal sealed class NetworkClient : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogErrorWriting(LoggerName, RemoteEndPoint, ex.Message);
+            Logger.LogErrorWriting(ConnectionIndex, RemoteEndPoint, ex.Message);
             Dispose();
             throw;
         }
@@ -143,7 +143,7 @@ internal sealed class NetworkClient : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogErrorReading(LoggerName, RemoteEndPoint, ex.Message);
+            Logger.LogErrorReading(ConnectionIndex, RemoteEndPoint, ex.Message);
             Dispose();
             throw;
         }
@@ -169,6 +169,6 @@ internal sealed class NetworkClient : IDisposable
         NetSocket.Close();
         ReadBuffer.Dispose();
         AsyncRoot.Dispose();
-        Logger.LogClientDisconnected(LoggerName, RemoteEndPoint);
+        Logger.LogClientDisconnected(ConnectionIndex, RemoteEndPoint);
     }
 }

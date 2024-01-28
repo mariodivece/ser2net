@@ -9,7 +9,6 @@ internal sealed class SerialPortBroker(
     DataBridge dataBridge) :
     BufferWorkerBase<SerialPortBroker>(logger, settings, dataBridge)
 {
-    const string LoggerName = "Serial";
     private SerialPort? Port;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -46,11 +45,14 @@ internal sealed class SerialPortBroker(
                     var receiveTask = ReceiveSerialPortDataAsync(Port, readBuffer, stoppingToken);
 
                     // send data to serial port
-                    if (pendingWriteLength > 0)
+                    while (pendingWriteLength > 0)
                     {
+                        var writeLength = Math.Min(pendingWriteLength, Port.WriteBufferSize);
                         await Port.BaseStream
-                            .WriteAsync(writeBuffer[..pendingWriteLength], stoppingToken)
+                            .WriteAsync(writeBuffer[..writeLength], stoppingToken)
                             .ConfigureAwait(false);
+
+                        pendingWriteLength -= writeLength;
                     }
 
                     // wait for the receive task to complete also
@@ -62,7 +64,7 @@ internal sealed class SerialPortBroker(
                 }
                 catch
                 {
-                    Logger.LogPortDisconnected(LoggerName, Port?.PortName ?? "NOPORT");
+                    Logger.LogPortDisconnected(ConnectionIndex, Port?.PortName ?? "NOPORT");
                     Port?.Close();
                     Port?.Dispose();
                     Port = null;
@@ -76,7 +78,7 @@ internal sealed class SerialPortBroker(
         finally
         {
             Port?.Dispose();
-            Logger.LogBrokerStopped(LoggerName);
+            Logger.LogBrokerStopped(ConnectionIndex);
         }
     }
 
@@ -152,17 +154,17 @@ internal sealed class SerialPortBroker(
 
         try
         {
-            Logger.LogAttemptingConnection(LoggerName, portName);
+            Logger.LogAttemptingConnection(ConnectionIndex, portName);
             port = new SerialPort(portName,
                 Settings.BaudRate, Settings.Parity, Settings.DataBits, Settings.StopBits);
 
             port.Open();
-            Logger.LogPortConnected(LoggerName, portName);
+            Logger.LogPortConnected(ConnectionIndex, portName);
             return true;
         }
         catch
         {
-            Logger.LogConnectionFailed(LoggerName, portName);
+            Logger.LogConnectionFailed(ConnectionIndex, portName);
             return false;
         }
     }

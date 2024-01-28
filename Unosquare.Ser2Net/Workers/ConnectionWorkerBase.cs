@@ -1,6 +1,6 @@
 ﻿namespace Unosquare.Ser2Net.Workers;
 
-internal abstract class ConnectionWorkerBase<T> : BackgroundService
+internal abstract class ConnectionWorkerBase<T> : BackgroundService, IConnectionIndex
     where T : BackgroundService
 {
     protected ConnectionWorkerBase(ILogger<T> logger, ConnectionSettingsItem settings)
@@ -15,4 +15,6 @@ internal abstract class ConnectionWorkerBase<T> : BackgroundService
     protected ILogger<T> Logger { get; }
 
     public ConnectionSettingsItem Settings { get; }
+
+    public virtual int ConnectionIndex => Settings.ConnectionIndex;
 }

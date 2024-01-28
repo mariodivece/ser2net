@@ -2,8 +2,6 @@
 
 internal sealed class ConnectionSettingsItem : IConnectionIndex
 {
-    private const string LoggerName = "Settings";
-
     public ConnectionSettingsItem(
         int connectionIndex,
         IConfigurationSection configuration,
@@ -14,37 +12,37 @@ internal sealed class ConnectionSettingsItem : IConnectionIndex
         if (TryRead<IPAddress>(configuration, nameof(ServerIP), out var serverIP))
             ServerIP = serverIP;
         else
-            logger.LogDefaultSetting(LoggerName, nameof(ServerIP), ServerIP.ToString());
+            logger.LogDefaultSetting(ConnectionIndex, nameof(ServerIP), ServerIP.ToString());
 
         if (TryRead<int>(configuration, nameof(ServerPort), out var serverPort))
             ServerPort = serverPort;
         else
-            logger.LogDefaultSetting(LoggerName, nameof(ServerPort), ServerPort.ToString(CultureInfo.InvariantCulture));
+            logger.LogDefaultSetting(ConnectionIndex, nameof(ServerPort), ServerPort.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<string>(configuration, nameof(PortName), out var portName))
             PortName = portName;
         else
-            logger.LogDefaultSetting(LoggerName, nameof(PortName), PortName);
+            logger.LogDefaultSetting(ConnectionIndex, nameof(PortName), PortName);
 
         if (TryRead<int>(configuration, nameof(BaudRate), out var baudRate))
             BaudRate = baudRate;
         else
-            logger.LogDefaultSetting(LoggerName, nameof(BaudRate), BaudRate.ToString(CultureInfo.InvariantCulture));
+            logger.LogDefaultSetting(ConnectionIndex, nameof(BaudRate), BaudRate.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<int>(configuration, nameof(DataBits), out var dataBits))
             DataBits = dataBits;
         else
-            logger.LogDefaultSetting(LoggerName, nameof(DataBits), DataBits.ToString(CultureInfo.InvariantCulture));
+            logger.LogDefaultSetting(ConnectionIndex, nameof(DataBits), DataBits.ToString(CultureInfo.InvariantCulture));
 
         if (TryRead<StopBits>(configuration, nameof(StopBits), out var stopBits))
             StopBits = stopBits;
         else
-            logger.LogDefaultSetting(LoggerName, nameof(StopBits), StopBits.ToString());
+            logger.LogDefaultSetting(ConnectionIndex, nameof(StopBits), StopBits.ToString());
 
         if (TryRead<Parity>(configuration, nameof(Parity), out var parity))
             Parity = parity;
         else
-            logger.LogDefaultSetting(LoggerName, nameof(Parity), Parity.ToString());
+            logger.LogDefaultSetting(ConnectionIndex, nameof(Parity), Parity.ToString());
     }
 
     public int ConnectionIndex { get; }
