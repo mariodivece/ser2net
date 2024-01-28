@@ -7,7 +7,7 @@
 internal sealed class NetServer
     : ConnectionWorkerBase<NetServer>
 {
-    private int CurrentClientId;
+    private int LastClientId;
     private readonly ConcurrentDictionary<int, NetworkClient> m_Clients = new();
 
     /// <summary>
@@ -97,7 +97,7 @@ internal sealed class NetServer
                         continue;
                     }
 
-                    m_Clients[Interlocked.Increment(ref CurrentClientId)] = client;
+                    m_Clients[Interlocked.Increment(ref LastClientId)] = client;
                 }
                 catch (OperationCanceledException)
                 {

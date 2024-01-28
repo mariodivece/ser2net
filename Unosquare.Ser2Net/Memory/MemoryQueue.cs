@@ -22,7 +22,7 @@ public sealed class MemoryQueue<T> : IDisposable
     private readonly int CapacityGrowth;
     private readonly object SyncLock = new();
 
-    private int m_Count;
+    private int m_Length;
 
     /// <summary>
     /// Zero-based index of read operations, AKA the 'Head'.
@@ -76,14 +76,14 @@ public sealed class MemoryQueue<T> : IDisposable
     /// <summary>
     /// Gets number of elements that can currently be read off the queue.
     /// </summary>
-    public int Count
+    public int Length
     {
         get
         {
             lock (SyncLock)
-                return m_Count;
+                return m_Length;
         }
-        private set => m_Count = value;
+        private set => m_Length = value;
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public sealed class MemoryQueue<T> : IDisposable
         {
             ReadIndex = 0;
             WriteIndex = 0;
-            Count = 0;
+            Length = 0;
         }
     }
 
@@ -106,16 +106,16 @@ public sealed class MemoryQueue<T> : IDisposable
     {
         lock (SyncLock)
         {
-            if (elementCount > Count)
-                elementCount = Count;
+            if (elementCount > Length)
+                elementCount = Length;
 
             if (elementCount <= 0)
                 return;
 
             ReadIndex = (ReadIndex + elementCount) % Capacity;
-            Count -= elementCount;
+            Length -= elementCount;
 
-            if (Count == 0)
+            if (Length == 0)
             {
                 ReadIndex = 0;
                 WriteIndex = 0;
@@ -138,9 +138,9 @@ public sealed class MemoryQueue<T> : IDisposable
         lock (SyncLock)
         {
             // grow the underlying buffer if there's no more room
-            if (Count + elementCount > Capacity)
+            if (Length + elementCount > Capacity)
             {
-                var newCapacity = (Count + elementCount + CapacityGrowth) & ~CapacityGrowth;
+                var newCapacity = (Length + elementCount + CapacityGrowth) & ~CapacityGrowth;
                 Reallocate(newCapacity);
             }
 
@@ -172,7 +172,7 @@ public sealed class MemoryQueue<T> : IDisposable
             }
 
             WriteIndex = (WriteIndex + elementCount) % Capacity;
-            Count += elementCount;
+            Length += elementCount;
         }
     }
 
@@ -263,9 +263,9 @@ public sealed class MemoryQueue<T> : IDisposable
     private T[] PeekOrDequeue(int elementCount, bool doDequeue)
     {
         if (elementCount < 0)
-            elementCount = Count;
+            elementCount = Length;
 
-        elementCount = Math.Min(elementCount, Count);
+        elementCount = Math.Min(elementCount, Length);
         Span<T> output = stackalloc T[elementCount];
         elementCount = PeekOrDequeue(output, doDequeue);
         return output[..elementCount].ToArray();
@@ -278,8 +278,8 @@ public sealed class MemoryQueue<T> : IDisposable
         
         lock (SyncLock)
         {
-            if (targetCount > Count)
-                targetCount = Count;
+            if (targetCount > Length)
+                targetCount = Length;
 
             if (targetCount <= 0)
                 return 0;
@@ -311,9 +311,9 @@ public sealed class MemoryQueue<T> : IDisposable
             if (doDequeue)
             {
                 ReadIndex = (ReadIndex + targetCount) % Capacity;
-                Count -= targetCount;
+                Length -= targetCount;
 
-                if (Count == 0)
+                if (Length == 0)
                 {
                     ReadIndex = 0;
                     WriteIndex = 0;
@@ -332,13 +332,13 @@ public sealed class MemoryQueue<T> : IDisposable
 
         var newBuffer = new MemoryBlock<T>(newCapacity);
 
-        if (Count > 0)
+        if (Length > 0)
         {
             if (ReadIndex < WriteIndex)
             {
                 // we simply copy the surrent counted elements
-                var sourceRange = ReadIndex..(ReadIndex + Count);
-                var targetRange = ..Count;
+                var sourceRange = ReadIndex..(ReadIndex + Length);
+                var targetRange = ..Length;
                 Buffer[sourceRange].CopyTo(newBuffer[targetRange]);
             }
             else
@@ -357,7 +357,7 @@ public sealed class MemoryQueue<T> : IDisposable
         }
 
         ReadIndex = 0;
-        WriteIndex = Count;
+        WriteIndex = Length;
 
         // dispose the old buffer
         var oldBuffer = Buffer;

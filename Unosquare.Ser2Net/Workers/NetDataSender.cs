@@ -28,7 +28,7 @@ internal sealed class NetDataSender : BufferWorkerBase<NetDataSender>
             if (currentClients.Count <= 0 || payload.Length <= 0)
             {
                 // prevent exceptions on task delays
-                try { await Task.Delay(1, stoppingToken).ConfigureAwait(false); }
+                try { await Task.Delay(Constants.ShortDelayMilliseconds, stoppingToken).ConfigureAwait(false); }
                 catch { }
                 continue;
             }
