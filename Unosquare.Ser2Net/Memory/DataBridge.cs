@@ -20,6 +20,7 @@ internal sealed class DataBridge : IDisposable
     /// </summary>
     public DataQueue ToNetBuffer { get; } = new DataQueue(Constants.BridgeQueueSize);
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         ToPortBuffer.Dispose();

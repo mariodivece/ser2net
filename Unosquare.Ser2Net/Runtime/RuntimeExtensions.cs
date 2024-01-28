@@ -2,10 +2,28 @@
 
 internal static class RuntimeExtensions
 {
+    /// <summary>
+    /// Shorthand method for creating DI-injected instances.
+    /// </summary>
+    /// <param name="services">The services provider.</param>
+    /// <param name="parameters">A variable-length parameters list containing constructor parameters.</param>
+    /// <returns>
+    /// A new instance of the requested service.
+    /// </returns>
     public static T CreateInstance<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(
         this IServiceProvider services, params object[] parameters) =>
         ActivatorUtilities.CreateInstance<T>(services, parameters);
 
+
+    /// <summary>
+    /// Executes the child background services of the provided parent background service.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
+    /// <param name="parent">The parent containing the child background services.</param>
+    /// <param name="stoppingToken">A token that allows processing to be cancelled.</param>
+    /// <returns>
+    /// An awaitable task.
+    /// </returns>
     public static async Task RunChildWorkersAsync(
         this IParentBackgroundService parent,
         CancellationToken stoppingToken)

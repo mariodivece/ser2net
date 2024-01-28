@@ -11,7 +11,7 @@ internal sealed class RootWorkerService :
     BackgroundService,
     IParentBackgroundService
 {
-    private const string LoggerName = "Orchestrator";
+    private const string LoggerName = "Service Root";
     private readonly List<ConnectionProxy> _children = [];
 
     public RootWorkerService(

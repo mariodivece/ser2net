@@ -1,4 +1,6 @@
-﻿namespace Unosquare.Ser2Net.Services;
+﻿using System.Net.Security;
+
+namespace Unosquare.Ser2Net.Services;
 
 internal sealed class ConnectionSettingsItem : IConnectionIndex
 {
@@ -43,6 +45,9 @@ internal sealed class ConnectionSettingsItem : IConnectionIndex
             Parity = parity;
         else
             logger.LogDefaultSetting(ConnectionIndex, nameof(Parity), Parity.ToString());
+
+        logger.LogConfiguration(ConnectionIndex,
+            ServerIP.ToString(), ServerPort, PortName, BaudRate, DataBits, (int)StopBits, $"{Parity.ToString()[0]}");
     }
 
     public int ConnectionIndex { get; }
@@ -114,6 +119,14 @@ internal sealed class ConnectionSettingsItem : IConnectionIndex
                 value = (T)(object)stopBits;
                 return true;
             }
+        }
+        else if (typeof (T) == typeof(bool))
+        {
+            if (stringValue.Length <= 0)
+                return false;
+
+            var firstChar = char.ToUpperInvariant(stringValue[0]);
+            value = (T)(object)(firstChar is 'Y' or 'T' or '1');
         }
 
         return false;

@@ -2,15 +2,20 @@
 
 namespace Unosquare.Ser2Net.Services;
 
-
 /// <summary>
-/// Holds configuration items from the Connections settings of the configuration
+/// Holds a list of settings to be used for each <see cref="ConnectionProxy"/>.
 /// </summary>
 internal sealed class ConnectionSettings : IReadOnlyList<ConnectionSettingsItem>
 {
     private const string ConnectionsSectionName = "Connections";
     private readonly List<ConnectionSettingsItem> _connections = [];
     
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ConnectionSettings"/> class.
+    /// </summary>
+    /// <param name="configuration">The configuration.</param>
+    /// <param name="logger">The logger.</param>
     public ConnectionSettings(IConfiguration configuration, ILogger<ConnectionSettings> logger)
     {
         Logger = logger;

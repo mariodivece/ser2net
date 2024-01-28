@@ -7,9 +7,18 @@
 internal sealed class NetworkClient : IDisposable, IConnectionIndex
 {
     private readonly MemoryBlock<byte> ReadBuffer;
+    private readonly SemaphoreSlim AsyncRoot = new(1, 1);
+
+
+    /// <summary>
+    /// Controls whether simultaneous send and receive
+    /// operations are allowed for the socket.
+    /// </summary>
+    private readonly bool DisableConcurrency;
+
     private long _IsDisposed;
     private bool _IsConnected = true;
-    private readonly SemaphoreSlim AsyncRoot = new(1, 1);
+
 
     public NetworkClient(
         ILogger<NetworkClient> logger,
@@ -29,6 +38,8 @@ internal sealed class NetworkClient : IDisposable, IConnectionIndex
         ReadBuffer = new(BufferSize);
         NetSocket.ReceiveBufferSize = BufferSize;
         NetSocket.SendBufferSize = BufferSize;
+        // since we are using raw data comminication we want to avoid
+        // any sort of 'smart' buffering of data packets.
         NetSocket.NoDelay = true;
         NetSocket.Blocking = false;
         RemoteEndPoint = NetSocket.RemoteEndPoint ?? Constants.EmptyEndPoint;
@@ -87,7 +98,9 @@ internal sealed class NetworkClient : IDisposable, IConnectionIndex
             {
                 try
                 {
-                    await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    if (DisableConcurrency)
+                        await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+
                     if (!IsConnected)
                         throw new SocketException((int)SocketError.NotConnected);
 
@@ -96,7 +109,8 @@ internal sealed class NetworkClient : IDisposable, IConnectionIndex
                 }
                 finally
                 {
-                    AsyncRoot.Release();
+                    if (DisableConcurrency)
+                        AsyncRoot.Release();
                 }
             }
         }
@@ -121,11 +135,13 @@ internal sealed class NetworkClient : IDisposable, IConnectionIndex
             {
                 try
                 {
-                    await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    if (DisableConcurrency)
+                        await AsyncRoot.WaitAsync(cancellationToken).ConfigureAwait(false);
+
                     var bytesRead = await NetSocket
                         .ReceiveAsync(ReadBuffer.Memory[length..], cancellationToken)
                         .ConfigureAwait(false);
-                    
+
                     length += bytesRead;
 
                     if (bytesRead <= 0 || length >= ReadBuffer.Length)
@@ -133,7 +149,8 @@ internal sealed class NetworkClient : IDisposable, IConnectionIndex
                 }
                 finally
                 {
-                    AsyncRoot.Release();
+                    if (DisableConcurrency)
+                        AsyncRoot.Release();
                 }
             }
 

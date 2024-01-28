@@ -1,11 +1,22 @@
 ﻿namespace Unosquare.Ser2Net.Workers;
 
+/// <summary>
+/// A TCP listener waiting for connections on a specified local endpoint.
+/// This class cannot be inherited.
+/// </summary>
 internal sealed class NetServer
     : ConnectionWorkerBase<NetServer>
 {
-    private int ClientId;
+    private int CurrentClientId;
     private readonly ConcurrentDictionary<int, NetworkClient> m_Clients = new();
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NetServer"/> class.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when one or more required arguments are null.</exception>
+    /// <param name="logger">The logger.</param>
+    /// <param name="services">Gets the DI container services provider.</param>
+    /// <param name="settings">Options for controlling the operation.</param>
     public NetServer(
         ILogger<NetServer> logger,
         IServiceProvider services,
@@ -16,10 +27,23 @@ internal sealed class NetServer
         Services = services;
     }
 
+    /// <summary>
+    /// Gets the DI container services provider.
+    /// </summary>
     private IServiceProvider Services { get; }
 
+    /// <summary>
+    /// Gets a snapshot of the connected clients.
+    /// The underlying client collection may change
+    /// after the snapshot is taken.
+    /// </summary>
     public IReadOnlyList<NetworkClient> Clients => m_Clients.Values.ToArray();
 
+
+    /// <summary>
+    /// Disconnects the given client and removes it from the underlying client list.
+    /// </summary>
+    /// <param name="client">The client to disconnect.</param>
     public void Disconnect(NetworkClient client)
     {
         if (client is null)
@@ -37,6 +61,7 @@ internal sealed class NetServer
         }
     }
 
+    /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         TcpListener? tcpServer = default;
@@ -72,7 +97,7 @@ internal sealed class NetServer
                         continue;
                     }
 
-                    m_Clients[Interlocked.Increment(ref ClientId)] = client;
+                    m_Clients[Interlocked.Increment(ref CurrentClientId)] = client;
                 }
                 catch (OperationCanceledException)
                 {

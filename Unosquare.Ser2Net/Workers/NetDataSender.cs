@@ -23,9 +23,9 @@ internal sealed class NetDataSender : BufferWorkerBase<NetDataSender>
         while (!stoppingToken.IsCancellationRequested)
         {
             var currentClients = Server.Clients;
-            var echoBytes = DataBridge.ToNetBuffer.DequeueAll();
+            var payload = DataBridge.ToNetBuffer.DequeueAll();
 
-            if (currentClients.Count <= 0 || echoBytes.Length <= 0)
+            if (currentClients.Count <= 0 || payload.Length <= 0)
             {
                 // prevent exceptions on task delays
                 try { await Task.Delay(1, stoppingToken).ConfigureAwait(false); }
@@ -37,7 +37,7 @@ internal sealed class NetDataSender : BufferWorkerBase<NetDataSender>
             {
                 try
                 {
-                    await client.SendAsync(echoBytes, stoppingToken).ConfigureAwait(false);
+                    await client.SendAsync(payload, stoppingToken).ConfigureAwait(false);
                 }
                 catch
                 {
