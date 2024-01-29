@@ -1,7 +1,7 @@
 ﻿namespace Unosquare.Ser2Net.Memory;
 
 /// <summary>
-/// Defines a class that represents a generic, resizable circular queue.
+/// Defines a class that represents a generic, resizable circular, FIFO queue.
 /// Ideas initially taken from
 /// https://raw.githubusercontent.com/kelindar/circular-buffer/master/Source/ByteQueue.cs
 /// but then modernized it and changed it to use native memory for added performance.
@@ -100,7 +100,9 @@ public sealed class MemoryQueue<T> : IDisposable
     }
 
     /// <summary>
-    /// Clears the specified number of elements from the queue.
+    /// Clears the specified number of elements at the front of the queue.
+    /// In other words, perfoms the same as <see cref="Dequeue(int)"/> minus
+    /// the data copy operations.
     /// </summary>
     public void Clear(int elementCount)
     {
@@ -177,6 +179,18 @@ public sealed class MemoryQueue<T> : IDisposable
     }
 
     /// <summary>
+    /// Adds the provided element to the queue.
+    /// </summary>
+    /// <param name="element">The element to add.</param>
+    public void Enqueue(T element) => Enqueue([element]);
+
+    /// <summary>
+    /// Adds the provided elements to the queue.
+    /// </summary>
+    /// <param name="element">The element to add.</param>
+    public void Enqueue(params T[] elements) => Enqueue(new Span<T>(elements));
+
+    /// <summary>
     /// Dequeues the elements into a destination set.
     /// </summary>
     /// <param name="destination">The set in which the dequeued elements will be held.</param>
@@ -238,7 +252,10 @@ public sealed class MemoryQueue<T> : IDisposable
     /// <summary>
     /// Retrieves the specified number of elements without dequeueing them.
     /// </summary>
-    /// <param name="elementCount">The maximum number of elements to retrieve.</param>
+    /// <param name="elementCount">
+    /// The maximum number of elements to retrieve.
+    /// Specifying a negative number returns all available elements.
+    /// </param>
     /// <returns>The retrieved elements.</returns>
     public T[] Peek(int elementCount) => PeekOrDequeue(elementCount, doDequeue: false);
 
@@ -275,7 +292,7 @@ public sealed class MemoryQueue<T> : IDisposable
     private int PeekOrDequeue(Span<T> destination, bool doDequeue)
     {
         var targetCount = destination.Length;
-        
+
         lock (SyncLock)
         {
             if (targetCount > Length)

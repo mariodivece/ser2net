@@ -43,8 +43,6 @@ internal sealed class ConnectionProxy
 
     IReadOnlyList<BackgroundService> IParentBackgroundService.Children => _children;
 
-    public int ConnectionIndex => Settings.ConnectionIndex;
-
     public DataBridge DataBridge { get; }
 
     private NetServer NetServer { get; }
