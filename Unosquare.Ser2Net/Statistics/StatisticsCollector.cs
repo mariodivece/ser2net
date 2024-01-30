@@ -11,7 +11,7 @@ namespace Unosquare.Ser2Net.Statistics;
 internal class StatisticsCollector<T> : IDisposable
     where T : unmanaged, INumber<T>
 {
-    private const int DefaultMaxDataPoints = 1000;
+    private const int DefaultCapacity = 1000;
     private readonly object SyncRoot = new();
     private readonly MemoryQueue<Sample<T>> SamplesQueue;
     private readonly bool IgnoreZeroes;
@@ -54,12 +54,12 @@ internal class StatisticsCollector<T> : IDisposable
     }
 
     public StatisticsCollector(bool ignoreZeroes)
-        : this(ignoreZeroes, DefaultMaxDataPoints)
+        : this(ignoreZeroes, DefaultCapacity)
     {
         // placeholder
     }
 
-    public StatisticsCollector() : this(false, DefaultMaxDataPoints)
+    public StatisticsCollector() : this(false, DefaultCapacity)
     {
         // placeholder
     }

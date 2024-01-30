@@ -53,5 +53,5 @@ internal static class Constants
     /// <summary>
     /// Controls how many samples are collected before reporting them.
     /// </summary>
-    public const long ReportSampleCount = 50L;
+    public const long ReportSampleCount = 100L;
 }

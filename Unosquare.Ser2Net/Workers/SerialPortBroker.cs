@@ -19,8 +19,8 @@ internal sealed class SerialPortBroker(
         using var rxBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
         using var txBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
 
-        using var rxStats = new StatisticsCollector<int>(ignoreZeroes: true);
-        using var txStats = new StatisticsCollector<int>(ignoreZeroes: true);
+        using var rxStats = new StatisticsCollector<int>(ignoreZeroes: true, capacity: (int)Constants.ReportSampleCount);
+        using var txStats = new StatisticsCollector<int>(ignoreZeroes: true, capacity: (int)Constants.ReportSampleCount);
 
         try
         {

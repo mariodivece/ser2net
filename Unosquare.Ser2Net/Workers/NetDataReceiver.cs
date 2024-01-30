@@ -20,7 +20,7 @@ internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var lastReportSampleCount = -1L;
-        using var stats = new StatisticsCollector<int>(ignoreZeroes: true);
+        using var stats = new StatisticsCollector<int>(ignoreZeroes: true, capacity: (int)Constants.ReportSampleCount);
 
         while (!stoppingToken.IsCancellationRequested)
         {
