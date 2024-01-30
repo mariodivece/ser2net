@@ -16,7 +16,7 @@ internal class StatisticsCollector<T> : IDisposable
     private readonly MemoryQueue<Sample<T>> SamplesQueue;
     private readonly bool IgnoreZeroes;
     private readonly int m_Capacity;
-    private bool PendingRecompute;
+    private bool IsRecomputePending;
 
     #region Synchronized computed state variables
 
@@ -462,7 +462,7 @@ internal class StatisticsCollector<T> : IDisposable
     {
         lock (SyncRoot)
         {
-            if (!PendingRecompute && !force)
+            if (!IsRecomputePending && !force)
                 return;
 
             // reset stats
@@ -541,7 +541,7 @@ internal class StatisticsCollector<T> : IDisposable
                     TimeSpan.FromMilliseconds(lastSampleElapsedSecs * 1000d));
             }
 
-            PendingRecompute = false;
+            IsRecomputePending = false;
         }
     }
 
@@ -582,7 +582,7 @@ internal class StatisticsCollector<T> : IDisposable
                     Target.sLifetimeSampleCount += 1;
                 }
 
-                Target.PendingRecompute = true;
+                Target.IsRecomputePending = true;
             }
         }
 
