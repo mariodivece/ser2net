@@ -2,6 +2,10 @@
 
 internal static partial class LoggerExtensions
 {
+    [LoggerMessage(LogLevel.Information, "[{Source,-14}][{ConnectionIndex}] {OP} Total: {Total,16}    Rate: {Rate,19}")]
+    internal static partial void LogDataStatistics(this ILogger logger, string source, int connectionIndex, TransferType op, string total, string rate);
+
+
     [LoggerMessage(LogLevel.Information, "[{Source,-14}] Service is starting . . .")]
     internal static partial void LogServiceStarting(this ILogger<RootWorkerService> logger, string source);
 

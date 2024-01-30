@@ -89,7 +89,7 @@ internal class StatisticsCollector<T> : IDisposable
 
     /// <summary>
     /// Gets the total unchecked sum of all the sample values that have been
-    /// sent to this collector regardles of their current availability.
+    /// sent to this collector regardless of their current availability.
     /// </summary>
     public double LifetimeSamplesSum
     {

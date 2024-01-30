@@ -2,10 +2,8 @@
 
 internal static class StatisticsExtensions
 {
-    public static void ReportStatistics(this ILogger logger, string source, int connetionIndex, TransferType op, StatisticsCollector<int> stats, ref long lastReportSampleCount)
+    public static void ReportStatistics(this ILogger logger, string source, int connectionIndex, TransferType op, StatisticsCollector<int> stats, ref long lastReportSampleCount)
     {
-        const string MessageTamplate = "[{Source,-14}][{ConnectionIndex}] {OP} Total: {Total,16}    Rate: {Rate,19}";
-
         var statCount = stats.LifetimeSampleCount;
 
         if (statCount <= 0 ||
@@ -15,7 +13,7 @@ internal static class StatisticsExtensions
 
         var total = stats.LifetimeSamplesSum.ToBits();
         var rate = stats.CurrentNaturalRate.HasValue ? $"{((double)stats.CurrentNaturalRate).ToBits()}/s." : "N/A";
-        logger.LogInformation(MessageTamplate, source, connetionIndex, op, total, rate);
+        logger.LogDataStatistics(source, connectionIndex, op, total, rate);
     }
 
     private static string ToBits(this double byteLength)
