@@ -1,6 +1,4 @@
-﻿using System.Xml;
-
-namespace Unosquare.Ser2Net.Workers;
+﻿namespace Unosquare.Ser2Net.Workers;
 
 /// <summary>
 /// Maintains a serial port connection and acts as a proxy to such serial port.
@@ -11,18 +9,22 @@ internal sealed class SerialPortBroker(
     DataBridge dataBridge) :
     BufferWorkerBase<SerialPortBroker>(logger, settings, dataBridge)
 {
+    /// <summary>
+    /// Controls how many samples are collected before reporting them.
+    /// </summary>
+    private const long ReportSampleCount = 50L;
+    private long LastReportSampleCount = -1L;
+
     private SerialPort? Port;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var readBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
-        using var writeBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
+        using var rxBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
+        using var txBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
 
-        using var readStats = new StatisticsCollector<int>(true);
-        using var writeStats = new StatisticsCollector<int>(true);
+        using var rxStats = new StatisticsCollector<int>(true);
+        using var txStats = new StatisticsCollector<int>(true);
 
-        var reportSampleCount = 50L;
-        var lastReportCount = -1L;
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -30,7 +32,7 @@ internal sealed class SerialPortBroker(
                 // always dequeue regardless of connection state
                 // because we don't want to fill up the queue with
                 // data when there is potentially no serial port connected
-                var pendingWriteLength = DataBridge.ToPortBuffer.Dequeue(writeBuffer);
+                var pendingWriteLength = DataBridge.ToPortBuffer.Dequeue(txBuffer);
 
                 // Attempt serial port connection if one is not active.
                 if (Port is null && !TryConnectWantedPort(out Port))
@@ -50,30 +52,20 @@ internal sealed class SerialPortBroker(
                 {
                     // fire up the receive task
                     var receiveTask = ReceiveSerialPortDataAsync(
-                        Port, readBuffer, DataBridge, readStats, stoppingToken)
+                        Port, rxBuffer, DataBridge, rxStats, stoppingToken)
                         .ConfigureAwait(false);
 
                     // fire up the send task
                     var sendTask = SendSerialPortDataAsync(
-                        Port, writeBuffer[..pendingWriteLength], writeStats, stoppingToken)
+                        Port, txBuffer[..pendingWriteLength], txStats, stoppingToken)
                         .ConfigureAwait(false);
 
                     // await the tasks
                     await receiveTask;
                     await sendTask;
 
-                    var statCount = readStats.LifetimeSampleCount + writeStats.LifetimeSampleCount;
-
-                    if (statCount != lastReportCount && statCount % reportSampleCount == 0)
-                    {
-                        Logger.LogInformation("TX Total: {TxTotal} TX Avg. Rate: {TxRate} RX Total: {RxTotal} RX Avg. Rate {RxRate}",
-                            writeStats.LifetimeSamplesSum,
-                            writeStats.CurrentRatesAverage,
-                            readStats.LifetimeSamplesSum,
-                            readStats.CurrentRatesAverage);
-
-                        lastReportCount = statCount;
-                    }
+                    // report stats if applicable
+                    ReportStatistics(rxStats, txStats);
 
                     // give the task a break if there's nothing to do at this point
                     if (Port is not null && Port.BytesToRead <= 0 && DataBridge.ToPortBuffer.Length <= 0)
@@ -97,6 +89,24 @@ internal sealed class SerialPortBroker(
             Port?.Dispose();
             Logger.LogBrokerStopped(ConnectionIndex);
         }
+    }
+
+    private void ReportStatistics(
+        StatisticsCollector<int> rxStats,
+        StatisticsCollector<int> txStats)
+    {
+        var statCount = rxStats.LifetimeSampleCount + txStats.LifetimeSampleCount;
+
+        if (statCount == LastReportSampleCount || statCount % ReportSampleCount != 0)
+            return;
+
+        Logger.LogInformation("TX Total: {TxTotal} TX Avg. Rate: {TxRate} RX Total: {RxTotal} RX Avg. Rate {RxRate}",
+            txStats.LifetimeSamplesSum,
+            txStats.CurrentRatesAverage,
+            rxStats.LifetimeSamplesSum,
+            rxStats.CurrentRatesAverage);
+
+        LastReportSampleCount = statCount;
     }
 
     private static async ValueTask<int> ReceiveSerialPortDataAsync(
