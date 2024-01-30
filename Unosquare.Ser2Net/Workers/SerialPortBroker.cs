@@ -54,14 +54,14 @@ internal sealed class SerialPortBroker(
                     var sendTask = SendSerialPortDataAsync(Port, writeBuffer[..pendingWriteLength], stoppingToken).ConfigureAwait(false);
 
                     // await the tasks
-                    readSample.Commit(await receiveTask);
-                    writeSample.Commit(await sendTask);
+                    readSample.Record(await receiveTask);
+                    writeSample.Record(await sendTask);
 
                     var statCount = readStats.LifetimeSampleCount + writeStats.LifetimeSampleCount;
 
                     if (statCount != lastReportCount && statCount % reportSampleCount == 0)
                     {
-                        Logger.LogInformation("TX Total: {txTotal} TX Avg. Rate: {txRate} RX Total: {rxTotal} RX Avg. Rate {rxRate}",
+                        Logger.LogInformation("TX Total: {TxTotal} TX Avg. Rate: {TxRate} RX Total: {RxTotal} RX Avg. Rate {RxRate}",
                             writeStats.LifetimeSamplesSum,
                             writeStats.CurrentRatesAverage,
                             readStats.LifetimeSamplesSum,

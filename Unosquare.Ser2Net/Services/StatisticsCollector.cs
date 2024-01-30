@@ -29,6 +29,11 @@ internal class StatisticsCollector<T> : IDisposable
     private double? currentRatesMin;
     private double? currentRatesMax;
 
+    public StatisticsCollector() : this(false)
+    {
+        // placeholder
+    }
+
     public StatisticsCollector(bool ignoreZeroes)
     {
         IgnoreZeroes = ignoreZeroes;
@@ -259,7 +264,7 @@ internal class StatisticsCollector<T> : IDisposable
     private record struct Recorder : ISampleRecorder<T>
     {
         private readonly StatisticsCollector<T> Target;
-        private long HasCommitted;
+        private long HasRecorded;
         public long StartTimestamp = Stopwatch.GetTimestamp();
 
         public Recorder(StatisticsCollector<T> target)
@@ -267,10 +272,11 @@ internal class StatisticsCollector<T> : IDisposable
             Target = target;
         }
 
-        public void Commit(T sampleValue)
+        public void Record(T sampleValue)
         {
-            if (Interlocked.Increment(ref HasCommitted) > 1)
-                return;
+            if (Interlocked.Increment(ref HasRecorded) > 1)
+                throw new InvalidOperationException(
+                    $"{nameof(Record)} can only be called once in the lifetime of this {nameof(ISampleRecorder<T>)}.");
 
             if (Target.IgnoreZeroes && T.IsZero(sampleValue))
                 return;
@@ -296,7 +302,7 @@ internal class StatisticsCollector<T> : IDisposable
             }
         }
 
-        public void Dispose()
+        public readonly void Dispose()
         {
             // placeholder
         }
@@ -346,5 +352,5 @@ internal readonly struct Sample<T>
 internal interface ISampleRecorder<T> : IDisposable
     where T : unmanaged, INumber<T>
 {
-    void Commit(T sampleValue);
+    void Record(T sampleValue);
 }
