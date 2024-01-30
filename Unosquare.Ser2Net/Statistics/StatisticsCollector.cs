@@ -16,6 +16,7 @@ internal class StatisticsCollector<T> : IDisposable
     private readonly MemoryQueue<Sample<T>> SamplesQueue;
     private readonly bool IgnoreZeroes;
     private readonly int m_Capacity;
+    private bool PendingRecompute;
 
     #region Synchronized computed state variables
 
@@ -76,9 +77,13 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return !sLifetimeTimestamp.HasValue
                     ? TimeSpan.Zero
                     : Stopwatch.GetElapsedTime(sLifetimeTimestamp.Value);
+            }
+
         }
     }
 
@@ -91,7 +96,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sLifetimeSamplesSum;
+            }
         }
     }
 
@@ -104,7 +112,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sLifetimeSampleCount;
+            }
         }
     }
 
@@ -116,7 +127,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentSampleCount;
+            }
         }
     }
 
@@ -134,7 +148,12 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
-                return sCurrentSampleCount <= 0 ? default : TimeSpan.FromMilliseconds(sCurrentElapsedSum * 1000d);
+            {
+                RecomputeStatistics();
+                return sCurrentSampleCount <= 0
+                    ? default
+                    : TimeSpan.FromMilliseconds(sCurrentElapsedSum * 1000d);
+            }
         }
     }
 
@@ -152,7 +171,12 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
-                return sCurrentSampleCount <= 0 ? default : TimeSpan.FromMilliseconds(sCurrentElapsedSum * 1000d / sCurrentSampleCount);
+            {
+                RecomputeStatistics();
+                return sCurrentSampleCount <= 0
+                    ? default
+                    : TimeSpan.FromMilliseconds(sCurrentElapsedSum * 1000d / sCurrentSampleCount);
+            }
         }
     }
 
@@ -170,8 +194,12 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentSampleCount <= 0 || !sCurrentElapsedMin.HasValue
-                    ? default : TimeSpan.FromMilliseconds(sCurrentElapsedMin.Value * 1000d);
+                    ? default
+                    : TimeSpan.FromMilliseconds(sCurrentElapsedMin.Value * 1000d);
+            }
         }
     }
 
@@ -189,8 +217,12 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentSampleCount <= 0 || !sCurrentElapsedMax.HasValue
-                    ? default : TimeSpan.FromMilliseconds(sCurrentElapsedMax.Value * 1000d);
+                    ? default
+                    : TimeSpan.FromMilliseconds(sCurrentElapsedMax.Value * 1000d);
+            }
         }
     }
 
@@ -203,7 +235,12 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
-                return sCurrentSampleCount <= 0 ? default : sCurrentSamplesSum;
+            {
+                RecomputeStatistics();
+                return sCurrentSampleCount <= 0
+                    ? default
+                    : sCurrentSamplesSum;
+            }
         }
     }
 
@@ -216,7 +253,12 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
-                return sCurrentSampleCount <= 0 ? default : sCurrentSamplesSum / sCurrentSampleCount;
+            {
+                RecomputeStatistics();
+                return sCurrentSampleCount <= 0
+                    ? default
+                    : sCurrentSamplesSum / sCurrentSampleCount;
+            }
         }
     }
 
@@ -229,7 +271,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentSamplesMin;
+            }
         }
     }
 
@@ -242,7 +287,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentSamplesMax;
+            }
         }
     }
 
@@ -255,7 +303,12 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
-                return sCurrentSampleCount <= 0 ? default : sCurrentRatesSum;
+            {
+                RecomputeStatistics();
+                return sCurrentSampleCount <= 0
+                    ? default
+                    : sCurrentRatesSum;
+            }
         }
     }
 
@@ -268,7 +321,12 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
-                return sCurrentSampleCount <= 0 ? default : sCurrentRatesSum / sCurrentSampleCount;
+            {
+                RecomputeStatistics();
+                return sCurrentSampleCount <= 0
+                    ? default
+                    : sCurrentRatesSum / sCurrentSampleCount;
+            }
         }
     }
 
@@ -281,7 +339,11 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentRatesMin;
+            }
+
         }
     }
 
@@ -294,7 +356,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentRatesMax;
+            }
         }
     }
 
@@ -307,7 +372,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentTimestampMin;
+            }
         }
     }
 
@@ -320,7 +388,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentTimestampMax;
+            }
         }
     }
 
@@ -335,7 +406,10 @@ internal class StatisticsCollector<T> : IDisposable
         get
         {
             lock (SyncRoot)
+            {
+                RecomputeStatistics();
                 return sCurrentNaturalElapsed;
+            }
         }
     }
 
@@ -349,6 +423,8 @@ internal class StatisticsCollector<T> : IDisposable
         {
             lock (SyncRoot)
             {
+                RecomputeStatistics();
+
                 if (!sCurrentNaturalElapsed.HasValue)
                     return default;
 
@@ -382,10 +458,13 @@ internal class StatisticsCollector<T> : IDisposable
         SamplesQueue.Dispose();
     }
 
-    private void RecomputeStatistics()
+    private void RecomputeStatistics(bool force = false)
     {
         lock (SyncRoot)
         {
+            if (!PendingRecompute && !force)
+                return;
+
             // reset stats
             sCurrentSampleCount = default;
 
@@ -461,6 +540,8 @@ internal class StatisticsCollector<T> : IDisposable
                 sCurrentNaturalElapsed = sCurrentNaturalElapsed.Value.Add(
                     TimeSpan.FromMilliseconds(lastSampleElapsedSecs * 1000d));
             }
+
+            PendingRecompute = false;
         }
     }
 
@@ -501,7 +582,7 @@ internal class StatisticsCollector<T> : IDisposable
                     Target.sLifetimeSampleCount += 1;
                 }
 
-                Target.RecomputeStatistics();
+                Target.PendingRecompute = true;
             }
         }
 
