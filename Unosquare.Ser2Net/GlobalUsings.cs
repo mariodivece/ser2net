@@ -15,3 +15,4 @@ global using Unosquare.Ser2Net.Memory;
 global using Unosquare.Ser2Net.Runtime;
 global using Unosquare.Ser2Net.Services;
 global using Unosquare.Ser2Net.Workers;
+global using Unosquare.Ser2Net.Statistics;

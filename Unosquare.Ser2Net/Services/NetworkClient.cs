@@ -9,16 +9,14 @@ internal sealed class NetworkClient : IDisposable, IConnectionIndex
     private readonly MemoryBlock<byte> ReadBuffer;
     private readonly SemaphoreSlim AsyncRoot = new(1, 1);
 
-
     /// <summary>
     /// Controls whether simultaneous send and receive
     /// operations are allowed for the socket.
     /// </summary>
-    private readonly bool DisableConcurrency;
+    private readonly bool DisableConcurrency = true;
 
     private long _IsDisposed;
     private bool _IsConnected = true;
-
 
     public NetworkClient(
         ILogger<NetworkClient> logger,

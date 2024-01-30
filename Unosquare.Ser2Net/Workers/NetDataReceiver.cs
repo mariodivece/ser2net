@@ -5,8 +5,6 @@
 /// </summary>
 internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
 {
-    private long LastReportSampleCount = -1L;
-
     public NetDataReceiver(
         ILogger<NetDataReceiver> logger,
         NetServer server,
@@ -21,6 +19,7 @@ internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var lastReportSampleCount = -1L;
         using var stats = new StatisticsCollector<int>(ignoreZeroes: true);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -41,33 +40,17 @@ internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
                     using var sample = stats.BeginSample();
                     var readBuffer = await client.ReceiveAsync(stoppingToken).ConfigureAwait(false);
                     DataBridge.ToPortBuffer.Enqueue(readBuffer.Span);
-                    sample.Record(readBuffer.Length);
+                    if (readBuffer.Length > 0)
+                    {
+                        sample.Record(readBuffer.Length);
+                        Logger.ReportStatistics("Network", ConnectionIndex, TransferType.RX, stats, ref lastReportSampleCount);
+                    }
                 }
                 catch
                 {
                     Server.Disconnect(client);
                 }
-                finally
-                {
-                    ReportStatistics(stats);
-                }
             }
         }
-    }
-
-    private void ReportStatistics(StatisticsCollector<int> stats)
-    {
-        var statCount = stats.LifetimeSampleCount;
-
-        if (statCount <= 0 ||
-            statCount == LastReportSampleCount ||
-            statCount % Constants.ReportSampleCount != 0)
-            return;
-
-        Logger.LogInformation("Data Total: {DataTotal} Data Avg. Rate: {DataRate}",
-            stats.LifetimeSamplesSum,
-            stats.CurrentNaturalRate);
-
-        LastReportSampleCount = statCount;
     }
 }

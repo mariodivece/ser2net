@@ -9,7 +9,8 @@ internal sealed class SerialPortBroker(
     DataBridge dataBridge) :
     BufferWorkerBase<SerialPortBroker>(logger, settings, dataBridge)
 {
-    private long LastReportSampleCount = -1L;
+    private long LastReportRxSampleCount = -1L;
+    private long LastReportTxSampleCount = -1L;
 
     private SerialPort? Port;
 
@@ -18,8 +19,8 @@ internal sealed class SerialPortBroker(
         using var rxBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
         using var txBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
 
-        using var rxStats = new StatisticsCollector<int>(true);
-        using var txStats = new StatisticsCollector<int>(true);
+        using var rxStats = new StatisticsCollector<int>(ignoreZeroes: true);
+        using var txStats = new StatisticsCollector<int>(ignoreZeroes: true);
 
         try
         {
@@ -57,11 +58,11 @@ internal sealed class SerialPortBroker(
                         .ConfigureAwait(false);
 
                     // await the tasks
-                    await receiveTask;
-                    await sendTask;
+                    if (await receiveTask > 0)
+                        Logger.ReportStatistics("Serial", ConnectionIndex, TransferType.RX, rxStats, ref LastReportRxSampleCount);
 
-                    // report stats if applicable
-                    ReportStatistics(rxStats, txStats);
+                    if (await sendTask > 0)
+                        Logger.ReportStatistics("Serial", ConnectionIndex, TransferType.TX, txStats, ref LastReportTxSampleCount);
 
                     // give the task a break if there's nothing to do at this point
                     if (Port is not null && Port.BytesToRead <= 0 && DataBridge.ToPortBuffer.Length <= 0)
@@ -85,24 +86,6 @@ internal sealed class SerialPortBroker(
             Port?.Dispose();
             Logger.LogBrokerStopped(ConnectionIndex);
         }
-    }
-
-    private void ReportStatistics(
-        StatisticsCollector<int> rxStats,
-        StatisticsCollector<int> txStats)
-    {
-        var statCount = rxStats.LifetimeSampleCount + txStats.LifetimeSampleCount;
-
-        if (statCount == LastReportSampleCount || statCount % Constants.ReportSampleCount != 0)
-            return;
-
-        Logger.LogInformation("TX Total: {TxTotal} TX Avg. Rate: {TxRate} RX Total: {RxTotal} RX Avg. Rate {RxRate}",
-            txStats.LifetimeSamplesSum,
-            txStats.CurrentNaturalRate,
-            rxStats.LifetimeSamplesSum,
-            rxStats.CurrentNaturalRate);
-
-        LastReportSampleCount = statCount;
     }
 
     private static async ValueTask<int> ReceiveSerialPortDataAsync(
