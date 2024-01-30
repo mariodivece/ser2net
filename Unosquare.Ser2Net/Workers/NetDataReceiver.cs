@@ -5,6 +5,8 @@
 /// </summary>
 internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
 {
+    private long LastReportSampleCount = -1L;
+
     public NetDataReceiver(
         ILogger<NetDataReceiver> logger,
         NetServer server,
@@ -12,7 +14,6 @@ internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
         : base(logger, server.Settings, dataBridge)
     {
         ArgumentNullException.ThrowIfNull(server);
-
         Server = server;
     }
 
@@ -20,6 +21,8 @@ internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var stats = new StatisticsCollector<int>(ignoreZeroes: true);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             var currentClients = Server.Clients;
@@ -35,14 +38,36 @@ internal sealed class NetDataReceiver : BufferWorkerBase<NetDataReceiver>
             {
                 try
                 {
+                    using var sample = stats.BeginSample();
                     var readBuffer = await client.ReceiveAsync(stoppingToken).ConfigureAwait(false);
                     DataBridge.ToPortBuffer.Enqueue(readBuffer.Span);
+                    sample.Record(readBuffer.Length);
                 }
                 catch
                 {
                     Server.Disconnect(client);
                 }
+                finally
+                {
+                    ReportStatistics(stats);
+                }
             }
         }
+    }
+
+    private void ReportStatistics(StatisticsCollector<int> stats)
+    {
+        var statCount = stats.LifetimeSampleCount;
+
+        if (statCount <= 0 ||
+            statCount == LastReportSampleCount ||
+            statCount % Constants.ReportSampleCount != 0)
+            return;
+
+        Logger.LogInformation("Data Total: {DataTotal} Data Avg. Rate: {DataRate}",
+            stats.LifetimeSamplesSum,
+            stats.CurrentNaturalRate);
+
+        LastReportSampleCount = statCount;
     }
 }

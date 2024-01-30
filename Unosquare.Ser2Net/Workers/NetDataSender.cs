@@ -5,6 +5,8 @@
 /// </summary>
 internal sealed class NetDataSender : BufferWorkerBase<NetDataSender>
 {
+    private long LastReportSampleCount = -1L;
+
     public NetDataSender(
         ILogger<NetDataSender> logger,
         NetServer server,
@@ -20,6 +22,8 @@ internal sealed class NetDataSender : BufferWorkerBase<NetDataSender>
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var stats = new StatisticsCollector<int>(ignoreZeroes: true);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             var currentClients = Server.Clients;
@@ -37,13 +41,35 @@ internal sealed class NetDataSender : BufferWorkerBase<NetDataSender>
             {
                 try
                 {
+                    using var sample = stats.BeginSample();
                     await client.SendAsync(payload, stoppingToken).ConfigureAwait(false);
+                    sample.Record(payload.Length);
                 }
                 catch
                 {
                     Server.Disconnect(client);
                 }
+                finally
+                {
+                    ReportStatistics(stats);
+                }
             }
         }
+    }
+
+    private void ReportStatistics(StatisticsCollector<int> stats)
+    {
+        var statCount = stats.LifetimeSampleCount;
+
+        if (statCount <= 0 ||
+            statCount == LastReportSampleCount ||
+            statCount % Constants.ReportSampleCount != 0)
+            return;
+
+        Logger.LogInformation("Data Total: {DataTotal} Data Avg. Rate: {DataRate}",
+            stats.LifetimeSamplesSum,
+            stats.CurrentNaturalRate);
+
+        LastReportSampleCount = statCount;
     }
 }

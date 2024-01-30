@@ -29,6 +29,10 @@ internal class StatisticsCollector<T> : IDisposable
     private double? currentRatesMin;
     private double? currentRatesMax;
 
+    private long? currentTimestampMin;
+    private long? currentTimestampMax;
+    private TimeSpan? currentNaturalElapsed;
+
     public StatisticsCollector() : this(false)
     {
         // placeholder
@@ -39,7 +43,7 @@ internal class StatisticsCollector<T> : IDisposable
         IgnoreZeroes = ignoreZeroes;
     }
 
-    public ISampleRecorder<T> Begin()
+    public ISampleRecorder<T> BeginSample()
     {
         LifetimeTimestamp ??= Stopwatch.GetTimestamp();
         return new Recorder(this);
@@ -83,6 +87,15 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the sum of <see cref="Sample{T}.ElapsedSeconds"/> of
+    /// the currently available samples.
+    /// </summary>
+    /// <remarks>
+    /// This computes on discrete <see cref="Sample{T}.ElapsedSeconds"/>
+    /// intervals. For total time elapsed of current samples, use
+    /// <see cref="CurrentNaturalElapsed"/> instead.
+    /// </remarks>
     public TimeSpan? CurrentElapsedSum
     {
         get
@@ -92,6 +105,15 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the average <see cref="Sample{T}.ElapsedSeconds"/> of
+    /// the currently available samples.
+    /// </summary>
+    /// <remarks>
+    /// This computes on discrete <see cref="Sample{T}.ElapsedSeconds"/>
+    /// intervals. For total time elapsed of current samples, use
+    /// <see cref="CurrentNaturalElapsed"/> instead.
+    /// </remarks>
     public TimeSpan? CurrentElapsedAverage
     {
         get
@@ -101,6 +123,15 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the minimum <see cref="Sample{T}.ElapsedSeconds"/> of
+    /// the currently available samples.
+    /// </summary>
+    /// <remarks>
+    /// This computes on discrete <see cref="Sample{T}.ElapsedSeconds"/>
+    /// intervals. For total time elapsed of current samples, use
+    /// <see cref="CurrentNaturalElapsed"/> instead.
+    /// </remarks>
     public TimeSpan? CurrentElapsedMin
     {
         get
@@ -111,6 +142,15 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the maximum <see cref="Sample{T}.ElapsedSeconds"/> of
+    /// the currently available samples.
+    /// </summary>
+    /// <remarks>
+    /// This computes on discrete <see cref="Sample{T}.ElapsedSeconds"/>
+    /// intervals. For total time elapsed of current samples, use
+    /// <see cref="CurrentNaturalElapsed"/> instead.
+    /// </remarks>
     public TimeSpan? CurrentElapsedMax
     {
         get
@@ -121,6 +161,10 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the sum of <see cref="Sample{T}.DoubleValue"/> of
+    /// the currently available samples.
+    /// </summary>
     public double? CurrentSamplesSum
     {
         get
@@ -130,6 +174,10 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the average <see cref="Sample{T}.DoubleValue"/> of
+    /// the currently available samples.
+    /// </summary>
     public double? CurrentSamplesAverage
     {
         get
@@ -139,6 +187,10 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the minimum of <see cref="Sample{T}.DoubleValue"/> of
+    /// the currently available samples.
+    /// </summary>
     public double? CurrentSamplesMin
     {
         get
@@ -148,6 +200,10 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the maximum of <see cref="Sample{T}.DoubleValue"/> of
+    /// the currently available samples.
+    /// </summary>
     public double? CurrentSamplesMax
     {
         get
@@ -157,6 +213,10 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the sum of <see cref="Sample{T}.Rate"/> of
+    /// the currently available samples.
+    /// </summary>
     public double? CurrentRatesSum
     {
         get
@@ -166,6 +226,10 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the average <see cref="Sample{T}.Rate"/> of
+    /// the currently available samples.
+    /// </summary>
     public double? CurrentRatesAverage
     {
         get
@@ -175,6 +239,10 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the minimum <see cref="Sample{T}.Rate"/> of
+    /// the currently available samples.
+    /// </summary>
     public double? CurrentRatesMin
     {
         get
@@ -184,12 +252,75 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the maximum <see cref="Sample{T}.Rate"/> of
+    /// the currently available samples.
+    /// </summary>
     public double? CurrentRatesMax
     {
         get
         {
             lock (SyncRoot)
                 return currentRatesMax;
+        }
+    }
+
+    /// <summary>
+    /// Gets the minimum <see cref="Sample{T}.StartTimestamp"/> of
+    /// the currently available samples.
+    /// </summary>
+    public long? CurrentTimestampMin
+    {
+        get
+        {
+            lock (SyncRoot)
+                return currentTimestampMin;
+        }
+    }
+
+    /// <summary>
+    /// Gets the maximum <see cref="Sample{T}.StartTimestamp"/> of
+    /// the currently available samples.
+    /// </summary>
+    public long? CurrentTimestampMax
+    {
+        get
+        {
+            lock (SyncRoot)
+                return currentTimestampMax;
+        }
+    }
+
+    /// <summary>
+    /// Gets the time elapsed from the currently available samples
+    /// using the time difference between <see cref="CurrentTimestampMin"/>
+    /// and <see cref="CurrentTimestampMax"/> plus the <see cref="Sample{T}.ElapsedSeconds"/>
+    /// of the last sample.
+    /// </summary>
+    public TimeSpan? CurrentNaturalElapsed
+    {
+        get
+        {
+            lock (SyncRoot)
+                return currentNaturalElapsed;
+        }
+    }
+
+    /// <summary>
+    /// Gets the natural rate of the currently availlable samples.
+    /// <see cref="CurrentSamplesSum"/> / <see cref="currentNaturalElapsed"/>
+    /// </summary>
+    public double? CurrentNaturalRate
+    {
+        get
+        {
+            lock (SyncRoot)
+            {
+                if (!currentNaturalElapsed.HasValue)
+                    return default;
+
+                return currentSamplesSum / currentNaturalElapsed.Value.TotalSeconds;
+            }
         }
     }
 
@@ -201,64 +332,6 @@ internal class StatisticsCollector<T> : IDisposable
     public void Dispose()
     {
         SamplesQueue.Dispose();
-    }
-
-    private void RecomputeStatistics()
-    {
-        lock (SyncRoot)
-        {
-            // reset stats
-            currentSampleCount = default;
-
-            currentElapsedSum = default;
-            currentElapsedMin = default;
-            currentElapsedMax = default;
-
-            currentSamplesSum = default;
-            currentSamplesMin = default;
-            currentSamplesMax = default;
-
-            currentRatesSum = default;
-            currentRatesMin = default;
-            currentRatesMax = default;
-
-            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
-            currentSampleCount = SamplesQueue.Peek(samples);
-            if (currentSampleCount <= 0)
-                return;
-
-            foreach (var sample in samples[0..currentSampleCount])
-            {
-                currentElapsedMin ??= sample.ElapsedSeconds;
-                currentElapsedMax ??= sample.ElapsedSeconds;
-                currentSamplesMin ??= sample.DoubleValue;
-                currentSamplesMax ??= sample.DoubleValue;
-                currentRatesMin ??= sample.Rate;
-                currentRatesMax ??= sample.Rate;
-
-                if (sample.ElapsedSeconds < currentElapsedMin.Value)
-                    currentElapsedMin = sample.ElapsedSeconds;
-
-                if (sample.ElapsedSeconds > currentElapsedMax.Value)
-                    currentElapsedMax = sample.ElapsedSeconds;
-
-                if (sample.DoubleValue < currentSamplesMin.Value)
-                    currentSamplesMin = sample.DoubleValue;
-
-                if (sample.DoubleValue > currentSamplesMax.Value)
-                    currentSamplesMax = sample.DoubleValue;
-
-                if (sample.Rate < currentRatesMin.Value)
-                    currentRatesMin = sample.Rate;
-
-                if (sample.Rate > currentRatesMax.Value)
-                    currentRatesMax = sample.Rate;
-
-                currentElapsedSum += sample.ElapsedSeconds;
-                currentSamplesSum += sample.DoubleValue;
-                currentRatesSum += sample.Rate;
-            }
-        }
     }
 
     private record struct Recorder : ISampleRecorder<T>
@@ -283,8 +356,7 @@ internal class StatisticsCollector<T> : IDisposable
 
             lock (Target.SyncRoot)
             {
-                var elapsed = Stopwatch.GetElapsedTime(StartTimestamp).TotalSeconds;
-                var sample = new Sample<T>(elapsed, sampleValue);
+                var sample = new Sample<T>(StartTimestamp, sampleValue);
                 if (Target.SamplesQueue.Length >= MaxDataPoints)
                     Target.SamplesQueue.Clear(1);
 
@@ -308,23 +380,132 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    private void RecomputeStatistics()
+    {
+        lock (SyncRoot)
+        {
+            // reset stats
+            currentSampleCount = default;
+
+            currentElapsedSum = default;
+            currentElapsedMin = default;
+            currentElapsedMax = default;
+
+            currentSamplesSum = default;
+            currentSamplesMin = default;
+            currentSamplesMax = default;
+
+            currentRatesSum = default;
+            currentRatesMin = default;
+            currentRatesMax = default;
+
+            currentTimestampMin = default;
+            currentTimestampMax = default;
+            currentNaturalElapsed = default;
+
+            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
+            currentSampleCount = SamplesQueue.Peek(samples);
+            if (currentSampleCount <= 0)
+                return;
+
+            var lastSampleElapsedSecs = -1d;
+
+            foreach (var sample in samples[0..currentSampleCount])
+            {
+                currentElapsedMin ??= sample.ElapsedSeconds;
+                currentElapsedMax ??= sample.ElapsedSeconds;
+                currentSamplesMin ??= sample.DoubleValue;
+                currentSamplesMax ??= sample.DoubleValue;
+                currentRatesMin ??= sample.Rate;
+                currentRatesMax ??= sample.Rate;
+                currentTimestampMin ??= sample.StartTimestamp;
+                currentTimestampMax ??= sample.StartTimestamp;
+
+                if (sample.ElapsedSeconds < currentElapsedMin.Value)
+                    currentElapsedMin = sample.ElapsedSeconds;
+
+                if (sample.ElapsedSeconds > currentElapsedMax.Value)
+                    currentElapsedMax = sample.ElapsedSeconds;
+
+                if (sample.DoubleValue < currentSamplesMin.Value)
+                    currentSamplesMin = sample.DoubleValue;
+
+                if (sample.DoubleValue > currentSamplesMax.Value)
+                    currentSamplesMax = sample.DoubleValue;
+
+                if (sample.Rate < currentRatesMin.Value)
+                    currentRatesMin = sample.Rate;
+
+                if (sample.Rate > currentRatesMax.Value)
+                    currentRatesMax = sample.Rate;
+
+                if (sample.StartTimestamp < currentTimestampMin.Value)
+                    currentTimestampMin = sample.StartTimestamp;
+
+                if (sample.StartTimestamp > currentTimestampMax.Value)
+                {
+                    currentTimestampMax = sample.StartTimestamp;
+                    lastSampleElapsedSecs = sample.ElapsedSeconds;
+                }
+
+                currentElapsedSum += sample.ElapsedSeconds;
+                currentSamplesSum += sample.DoubleValue;
+                currentRatesSum += sample.Rate;
+            }
+
+            if (currentTimestampMin.HasValue && currentTimestampMax.HasValue && lastSampleElapsedSecs != -1)
+            {
+                currentNaturalElapsed = Stopwatch.GetElapsedTime(currentTimestampMin.Value, currentTimestampMax.Value);
+                currentNaturalElapsed = currentNaturalElapsed.Value.Add(
+                    TimeSpan.FromMilliseconds(lastSampleElapsedSecs * 1000d));
+            }
+        }
+    }
 }
 
 internal readonly struct Sample<T>
     where T : unmanaged, INumber<T>
 {
-    public Sample(double elapsedSeconds, T value)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Sample&lt;T&gt;"/> struct.
+    /// </summary>
+    /// <param name="startTimestamp">The <see cref="Stopwatch.GetTimestamp"/> value marking the start
+    /// of the sample recording.</param>
+    /// <param name="value">The recorded sample value.</param>
+    public Sample(long startTimestamp, T value)
     {
-        ElapsedSeconds = elapsedSeconds;
+        StartTimestamp = startTimestamp;
+        ElapsedSeconds = Stopwatch.GetElapsedTime(startTimestamp).TotalSeconds;
         Value = value;
         DoubleValue = ToDouble(value);
-        Rate = DoubleValue / elapsedSeconds;
+        Rate = DoubleValue / ElapsedSeconds;
     }
 
+    /// <summary>
+    /// The <see cref="Stopwatch.GetTimestamp"/> value
+    /// marking the start of the sample recording.
+    /// </summary>
+    public readonly long StartTimestamp;
+
+    /// <summary>
+    /// The elapsed time in seconds of this sample recording.
+    /// </summary>
     public readonly double ElapsedSeconds;
-    public readonly T Value;
+
+    /// <summary>
+    /// The <see cref="DoubleValue"/> divided by <see cref="ElapsedSeconds"/>.
+    /// </summary>
     public readonly double Rate;
+
+    /// <summary>
+    /// The <see cref="Value"/> as a <see cref="double"/>
+    /// </summary>
     public readonly double DoubleValue;
+
+    /// <summary>
+    /// The recorded sample value.
+    /// </summary>
+    public readonly T Value;
 
     private static double ToDouble(T val) => val is double doubleVal
         ? doubleVal

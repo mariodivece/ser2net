@@ -49,4 +49,9 @@ internal static class Constants
     public const int BridgeQueueSize = 2048;
 
     public const string SettingsFilename = "unoser2net.json";
+
+    /// <summary>
+    /// Controls how many samples are collected before reporting them.
+    /// </summary>
+    public const long ReportSampleCount = 50L;
 }

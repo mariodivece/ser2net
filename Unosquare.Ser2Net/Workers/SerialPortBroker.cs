@@ -9,10 +9,6 @@ internal sealed class SerialPortBroker(
     DataBridge dataBridge) :
     BufferWorkerBase<SerialPortBroker>(logger, settings, dataBridge)
 {
-    /// <summary>
-    /// Controls how many samples are collected before reporting them.
-    /// </summary>
-    private const long ReportSampleCount = 50L;
     private long LastReportSampleCount = -1L;
 
     private SerialPort? Port;
@@ -97,14 +93,14 @@ internal sealed class SerialPortBroker(
     {
         var statCount = rxStats.LifetimeSampleCount + txStats.LifetimeSampleCount;
 
-        if (statCount == LastReportSampleCount || statCount % ReportSampleCount != 0)
+        if (statCount == LastReportSampleCount || statCount % Constants.ReportSampleCount != 0)
             return;
 
         Logger.LogInformation("TX Total: {TxTotal} TX Avg. Rate: {TxRate} RX Total: {RxTotal} RX Avg. Rate {RxRate}",
             txStats.LifetimeSamplesSum,
-            txStats.CurrentRatesAverage,
+            txStats.CurrentNaturalRate,
             rxStats.LifetimeSamplesSum,
-            rxStats.CurrentRatesAverage);
+            rxStats.CurrentNaturalRate);
 
         LastReportSampleCount = statCount;
     }
@@ -112,7 +108,7 @@ internal sealed class SerialPortBroker(
     private static async ValueTask<int> ReceiveSerialPortDataAsync(
         SerialPort? currentPort, Memory<byte> readMemory, DataBridge bridge, StatisticsCollector<int> stats, CancellationToken token)
     {
-        using var sample = stats.Begin();
+        using var sample = stats.BeginSample();
         var bytesRead = 0;
 
         try
@@ -142,7 +138,7 @@ internal sealed class SerialPortBroker(
     private static async ValueTask<int> SendSerialPortDataAsync(
         SerialPort? currentPort, Memory<byte> writeMemory, StatisticsCollector<int> stats, CancellationToken token)
     {
-        using var sample = stats.Begin();
+        using var sample = stats.BeginSample();
         var bytesWritten = 0;
 
         try
