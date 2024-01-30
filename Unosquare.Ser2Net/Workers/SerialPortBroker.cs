@@ -1,4 +1,6 @@
-﻿namespace Unosquare.Ser2Net.Workers;
+﻿using System.Xml;
+
+namespace Unosquare.Ser2Net.Workers;
 
 /// <summary>
 /// Maintains a serial port connection and acts as a proxy to such serial port.
@@ -46,16 +48,19 @@ internal sealed class SerialPortBroker(
 
                 try
                 {
-                    // fire up the send and receive tasks
-                    using var readSample = readStats.Begin();
-                    using var writeSample = writeStats.Begin();
+                    // fire up the receive task
+                    var receiveTask = ReceiveSerialPortDataAsync(
+                        Port, readBuffer, DataBridge, readStats, stoppingToken)
+                        .ConfigureAwait(false);
 
-                    var receiveTask = ReceiveSerialPortDataAsync(Port, readBuffer, DataBridge, stoppingToken).ConfigureAwait(false);
-                    var sendTask = SendSerialPortDataAsync(Port, writeBuffer[..pendingWriteLength], stoppingToken).ConfigureAwait(false);
+                    // fire up the send task
+                    var sendTask = SendSerialPortDataAsync(
+                        Port, writeBuffer[..pendingWriteLength], writeStats, stoppingToken)
+                        .ConfigureAwait(false);
 
                     // await the tasks
-                    readSample.Record(await receiveTask);
-                    writeSample.Record(await sendTask);
+                    await receiveTask;
+                    await sendTask;
 
                     var statCount = readStats.LifetimeSampleCount + writeStats.LifetimeSampleCount;
 
@@ -95,40 +100,61 @@ internal sealed class SerialPortBroker(
     }
 
     private static async ValueTask<int> ReceiveSerialPortDataAsync(
-        SerialPort? currentPort, Memory<byte> readMemory, DataBridge bridge, CancellationToken token)
+        SerialPort? currentPort, Memory<byte> readMemory, DataBridge bridge, StatisticsCollector<int> stats, CancellationToken token)
     {
-        if (currentPort is null ||
-            currentPort.BytesToRead <= 0 ||
-            !currentPort.IsOpen ||
-            currentPort.BreakState ||
-            token.IsCancellationRequested)
-            return 0;
+        using var sample = stats.Begin();
+        var bytesRead = 0;
 
-        var bytesRead = await currentPort.BaseStream
-            .ReadAsync(readMemory, token)
-            .ConfigureAwait(false);
+        try
+        {
+            if (currentPort is null ||
+                currentPort.BytesToRead <= 0 ||
+                !currentPort.IsOpen ||
+                currentPort.BreakState ||
+                token.IsCancellationRequested)
+                return 0;
 
-        if (bytesRead > 0)
-            bridge.ToNetBuffer.Enqueue(readMemory.Span[..bytesRead]);
+            bytesRead = await currentPort.BaseStream
+                .ReadAsync(readMemory, token)
+                .ConfigureAwait(false);
 
-        return bytesRead;
+            if (bytesRead > 0)
+                bridge.ToNetBuffer.Enqueue(readMemory.Span[..bytesRead]);
+
+            return bytesRead;
+        }
+        finally
+        {
+            sample.Record(bytesRead);
+        }
     }
 
     private static async ValueTask<int> SendSerialPortDataAsync(
-        SerialPort? currentPort, Memory<byte> writeMemory, CancellationToken token)
+        SerialPort? currentPort, Memory<byte> writeMemory, StatisticsCollector<int> stats, CancellationToken token)
     {
-        if (writeMemory.IsEmpty ||
-            currentPort is null ||
-            !currentPort.IsOpen ||
-            currentPort.BreakState ||
-            token.IsCancellationRequested)
-            return 0;
+        using var sample = stats.Begin();
+        var bytesWritten = 0;
 
-        await currentPort.BaseStream
-            .WriteAsync(writeMemory, token)
-            .ConfigureAwait(false);
+        try
+        {
+            if (writeMemory.IsEmpty ||
+                currentPort is null ||
+                !currentPort.IsOpen ||
+                currentPort.BreakState ||
+                token.IsCancellationRequested)
+                return 0;
 
-        return writeMemory.Length;
+            await currentPort.BaseStream
+                .WriteAsync(writeMemory, token)
+                .ConfigureAwait(false);
+
+            bytesWritten = writeMemory.Length;
+            return bytesWritten;
+        }
+        finally
+        {
+            sample.Record(bytesWritten);
+        }
     }
 
     private bool TryConnectWantedPort([MaybeNullWhen(false)] out SerialPort serialPort)
