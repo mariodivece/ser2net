@@ -14,28 +14,6 @@ internal static class Program
     /// </returns>
     public static async Task<int> Main(string[] args)
     {
-        using var c = new StatisticsCollector<int>();
-
-        using (var s = c.Begin())
-        {
-            Thread.Sleep(10);
-            s.Commit(12);
-        }
-
-        using (var s = c.Begin())
-        {
-            Thread.Sleep(20);
-            s.Commit(21);
-        }
-
-        using (var s = c.Begin())
-        {
-            Thread.Sleep(30);
-            s.Commit(7);
-        }
-
-        return 0;
-
         // Handle the special case where command-line arguments were issued.
         var resultCode = await CommandLine.HandleArgumentsAsync(args)
             .ConfigureAwait(false);

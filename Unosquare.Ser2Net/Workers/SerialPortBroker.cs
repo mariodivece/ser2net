@@ -16,6 +16,11 @@ internal sealed class SerialPortBroker(
         using var readBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
         using var writeBuffer = new MemoryBlock<byte>(Constants.DefaultBlockSize);
 
+        using var readStats = new StatisticsCollector<int>(true);
+        using var writeStats = new StatisticsCollector<int>(true);
+
+        var reportSampleCount = 50L;
+        var lastReportCount = -1L;
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -42,12 +47,28 @@ internal sealed class SerialPortBroker(
                 try
                 {
                     // fire up the send and receive tasks
+                    using var readSample = readStats.Begin();
+                    using var writeSample = writeStats.Begin();
+
                     var receiveTask = ReceiveSerialPortDataAsync(Port, readBuffer, DataBridge, stoppingToken).ConfigureAwait(false);
                     var sendTask = SendSerialPortDataAsync(Port, writeBuffer[..pendingWriteLength], stoppingToken).ConfigureAwait(false);
 
                     // await the tasks
-                    await receiveTask;
-                    await sendTask;
+                    readSample.Commit(await receiveTask);
+                    writeSample.Commit(await sendTask);
+
+                    var statCount = readStats.LifetimeSampleCount + writeStats.LifetimeSampleCount;
+
+                    if (statCount != lastReportCount && statCount % reportSampleCount == 0)
+                    {
+                        Logger.LogInformation("TX Total: {txTotal} TX Avg. Rate: {txRate} RX Total: {rxTotal} RX Avg. Rate {rxRate}",
+                            writeStats.LifetimeSamplesSum,
+                            writeStats.CurrentRatesAverage,
+                            readStats.LifetimeSamplesSum,
+                            readStats.CurrentRatesAverage);
+
+                        lastReportCount = statCount;
+                    }
 
                     // give the task a break if there's nothing to do at this point
                     if (Port is not null && Port.BytesToRead <= 0 && DataBridge.ToPortBuffer.Length <= 0)
@@ -73,7 +94,7 @@ internal sealed class SerialPortBroker(
         }
     }
 
-    private static async ValueTask ReceiveSerialPortDataAsync(
+    private static async ValueTask<int> ReceiveSerialPortDataAsync(
         SerialPort? currentPort, Memory<byte> readMemory, DataBridge bridge, CancellationToken token)
     {
         if (currentPort is null ||
@@ -81,7 +102,7 @@ internal sealed class SerialPortBroker(
             !currentPort.IsOpen ||
             currentPort.BreakState ||
             token.IsCancellationRequested)
-            return;
+            return 0;
 
         var bytesRead = await currentPort.BaseStream
             .ReadAsync(readMemory, token)
@@ -89,9 +110,11 @@ internal sealed class SerialPortBroker(
 
         if (bytesRead > 0)
             bridge.ToNetBuffer.Enqueue(readMemory.Span[..bytesRead]);
+
+        return bytesRead;
     }
 
-    private static async ValueTask SendSerialPortDataAsync(
+    private static async ValueTask<int> SendSerialPortDataAsync(
         SerialPort? currentPort, Memory<byte> writeMemory, CancellationToken token)
     {
         if (writeMemory.IsEmpty ||
@@ -99,11 +122,13 @@ internal sealed class SerialPortBroker(
             !currentPort.IsOpen ||
             currentPort.BreakState ||
             token.IsCancellationRequested)
-            return;
+            return 0;
 
         await currentPort.BaseStream
             .WriteAsync(writeMemory, token)
             .ConfigureAwait(false);
+
+        return writeMemory.Length;
     }
 
     private bool TryConnectWantedPort([MaybeNullWhen(false)] out SerialPort serialPort)

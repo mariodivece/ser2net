@@ -8,9 +8,31 @@ internal class StatisticsCollector<T> : IDisposable
     private const int MaxDataPoints = 1000;
     private readonly object SyncRoot = new();
     private readonly MemoryQueue<Sample<T>> SamplesQueue = new(MaxDataPoints);
+    private readonly bool IgnoreZeroes;
+
     private long? LifetimeTimestamp;
     private ulong m_TotalSampleCount;
-    private T m_LifetimeSamplesSum;
+    private double m_LifetimeSamplesSum;
+    private long m_LifetimeSampleCount;
+
+    private int currentSampleCount;
+
+    private double currentElapsedSum;
+    private double? currentElapsedMin;
+    private double? currentElapsedMax;
+
+    private double currentSamplesSum;
+    private double? currentSamplesMin;
+    private double? currentSamplesMax;
+
+    private double currentRatesSum;
+    private double? currentRatesMin;
+    private double? currentRatesMax;
+
+    public StatisticsCollector(bool ignoreZeroes)
+    {
+        IgnoreZeroes = ignoreZeroes;
+    }
 
     public ISampleRecorder<T> Begin()
     {
@@ -29,7 +51,7 @@ internal class StatisticsCollector<T> : IDisposable
     /// Gets the total unchecked sum of all the sample values that have been,
     /// sent to this collector regardles of their current availability.
     /// </summary>
-    public T LifetimeSamplesSum
+    public double LifetimeSamplesSum
     {
         get
         {
@@ -38,20 +60,30 @@ internal class StatisticsCollector<T> : IDisposable
         }
     }
 
+    public long LifetimeSampleCount
+    {
+        get
+        {
+            lock (SyncRoot)
+                return m_LifetimeSampleCount;
+        }
+    }
+
+    public int CurrentSampleCount
+    {
+        get
+        {
+            lock (SyncRoot)
+                return currentSampleCount;
+        }
+    }
+
     public TimeSpan? CurrentElapsedSum
     {
         get
         {
-            if (SamplesQueue.Length <= 0)
-                return null;
-
-            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
-            SamplesQueue.Peek(samples);
-            var totalSeconds = 0d;
-            foreach (var sample in samples)
-                totalSeconds += sample.ElapsedSeconds;
-
-            return TimeSpan.FromMilliseconds(totalSeconds * 1000d);
+            lock (SyncRoot)
+                return currentSampleCount <= 0 ? default : TimeSpan.FromMilliseconds(currentElapsedSum * 1000d);
         }
     }
 
@@ -59,14 +91,8 @@ internal class StatisticsCollector<T> : IDisposable
     {
         get
         {
-            var currentSum = CurrentElapsedSum;
-            var count = SamplesQueue.Length;
-
-            if (!currentSum.HasValue || count <= 0)
-                return null;
-
-            return TimeSpan.FromMilliseconds(
-                currentSum.Value.TotalMilliseconds / count);
+            lock (SyncRoot)
+                return currentSampleCount <= 0 ? default : TimeSpan.FromMilliseconds(currentElapsedSum * 1000d / currentSampleCount);
         }
     }
 
@@ -74,21 +100,9 @@ internal class StatisticsCollector<T> : IDisposable
     {
         get
         {
-            if (SamplesQueue.Length <= 0)
-                return null;
-
-            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
-            SamplesQueue.Peek(samples);
-
-            
-            var result = samples[0].ElapsedSeconds;
-            foreach (var sample in samples)
-            {
-                if (sample.ElapsedSeconds < result)
-                    result = sample.ElapsedSeconds;
-            }
-
-            return TimeSpan.FromMilliseconds(result * 1000d);
+            lock (SyncRoot)
+                return currentSampleCount <= 0 || !currentElapsedMin.HasValue
+                    ? default : TimeSpan.FromMilliseconds(currentElapsedMin.Value * 1000d);
         }
     }
 
@@ -96,37 +110,18 @@ internal class StatisticsCollector<T> : IDisposable
     {
         get
         {
-            if (SamplesQueue.Length <= 0)
-                return null;
-
-            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
-            SamplesQueue.Peek(samples);
-
-            var result = samples[0].ElapsedSeconds;
-            foreach (var sample in samples)
-            {
-                if (sample.ElapsedSeconds > result)
-                    result = sample.ElapsedSeconds;
-            }
-
-            return TimeSpan.FromMilliseconds(result * 1000d);
+            lock (SyncRoot)
+                return currentSampleCount <= 0 || !currentElapsedMax.HasValue
+                    ? default : TimeSpan.FromMilliseconds(currentElapsedMax.Value * 1000d);
         }
     }
 
-    public T? CurrentSamplesSum
+    public double? CurrentSamplesSum
     {
         get
         {
-            if (SamplesQueue.Length <= 0)
-                return null;
-
-            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
-            SamplesQueue.Peek(samples);
-            T accumValue = default;
-            foreach (var sample in samples)
-                accumValue += sample.Value;
-
-            return accumValue;
+            lock (SyncRoot)
+                return currentSampleCount <= 0 ? default : currentSamplesSum;
         }
     }
 
@@ -134,57 +129,62 @@ internal class StatisticsCollector<T> : IDisposable
     {
         get
         {
-            var currentSum = CurrentSamplesSum;
-            var count = SamplesQueue.Length;
-
-            if (!currentSum.HasValue || count <= 0)
-                return null;
-
-            var doubleSum = double.Parse(currentSum.Value.ToString()!, CultureInfo.InvariantCulture);
-
-            return doubleSum / count;
+            lock (SyncRoot)
+                return currentSampleCount <= 0 ? default : currentSamplesSum / currentSampleCount;
         }
     }
 
-    public T? CurrentSamplesMin
+    public double? CurrentSamplesMin
     {
         get
         {
-            if (SamplesQueue.Length <= 0)
-                return null;
-
-            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
-            SamplesQueue.Peek(samples);
-
-            var result = samples[0].Value;
-            foreach (var sample in samples)
-            {
-                if (sample.Value < result)
-                    result = sample.Value;
-            }
-
-            return result;
+            lock (SyncRoot)
+                return currentSamplesMin;
         }
     }
 
-    public T? CurrentSamplesMax
+    public double? CurrentSamplesMax
     {
         get
         {
-            if (SamplesQueue.Length <= 0)
-                return null;
+            lock (SyncRoot)
+                return currentSamplesMax;
+        }
+    }
 
-            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
-            SamplesQueue.Peek(samples);
+    public double? CurrentRatesSum
+    {
+        get
+        {
+            lock (SyncRoot)
+                return currentSampleCount <= 0 ? default : currentRatesSum;
+        }
+    }
 
-            var result = samples[0].Value;
-            foreach (var sample in samples)
-            {
-                if (sample.Value > result)
-                    result = sample.Value;
-            }
+    public double? CurrentRatesAverage
+    {
+        get
+        {
+            lock (SyncRoot)
+                return currentSampleCount <= 0 ? default : currentRatesSum / currentSampleCount;
+        }
+    }
 
-            return result;
+    public double? CurrentRatesMin
+    {
+        get
+        {
+            lock (SyncRoot)
+                return currentRatesMin;
+        }
+    }
+
+    public double? CurrentRatesMax
+    {
+        get
+        {
+            lock (SyncRoot)
+                return currentRatesMax;
         }
     }
 
@@ -196,6 +196,64 @@ internal class StatisticsCollector<T> : IDisposable
     public void Dispose()
     {
         SamplesQueue.Dispose();
+    }
+
+    private void RecomputeStatistics()
+    {
+        lock (SyncRoot)
+        {
+            // reset stats
+            currentSampleCount = default;
+
+            currentElapsedSum = default;
+            currentElapsedMin = default;
+            currentElapsedMax = default;
+
+            currentSamplesSum = default;
+            currentSamplesMin = default;
+            currentSamplesMax = default;
+
+            currentRatesSum = default;
+            currentRatesMin = default;
+            currentRatesMax = default;
+
+            Span<Sample<T>> samples = stackalloc Sample<T>[SamplesQueue.Length];
+            currentSampleCount = SamplesQueue.Peek(samples);
+            if (currentSampleCount <= 0)
+                return;
+
+            foreach (var sample in samples[0..currentSampleCount])
+            {
+                currentElapsedMin ??= sample.ElapsedSeconds;
+                currentElapsedMax ??= sample.ElapsedSeconds;
+                currentSamplesMin ??= sample.DoubleValue;
+                currentSamplesMax ??= sample.DoubleValue;
+                currentRatesMin ??= sample.Rate;
+                currentRatesMax ??= sample.Rate;
+
+                if (sample.ElapsedSeconds < currentElapsedMin.Value)
+                    currentElapsedMin = sample.ElapsedSeconds;
+
+                if (sample.ElapsedSeconds > currentElapsedMax.Value)
+                    currentElapsedMax = sample.ElapsedSeconds;
+
+                if (sample.DoubleValue < currentSamplesMin.Value)
+                    currentSamplesMin = sample.DoubleValue;
+
+                if (sample.DoubleValue > currentSamplesMax.Value)
+                    currentSamplesMax = sample.DoubleValue;
+
+                if (sample.Rate < currentRatesMin.Value)
+                    currentRatesMin = sample.Rate;
+
+                if (sample.Rate > currentRatesMax.Value)
+                    currentRatesMax = sample.Rate;
+
+                currentElapsedSum += sample.ElapsedSeconds;
+                currentSamplesSum += sample.DoubleValue;
+                currentRatesSum += sample.Rate;
+            }
+        }
     }
 
     private record struct Recorder : ISampleRecorder<T>
@@ -214,36 +272,75 @@ internal class StatisticsCollector<T> : IDisposable
             if (Interlocked.Increment(ref HasCommitted) > 1)
                 return;
 
-            var elapsed = Stopwatch.GetElapsedTime(StartTimestamp).TotalSeconds;
-            if (Target.SamplesQueue.Length >= MaxDataPoints)
-                Target.SamplesQueue.Clear(1);
+            if (Target.IgnoreZeroes && T.IsZero(sampleValue))
+                return;
 
-            Target.SamplesQueue.Enqueue(new Sample<T>(elapsed, sampleValue));
-
-            Interlocked.Increment(ref Target.m_TotalSampleCount);
             lock (Target.SyncRoot)
             {
+                var elapsed = Stopwatch.GetElapsedTime(StartTimestamp).TotalSeconds;
+                var sample = new Sample<T>(elapsed, sampleValue);
+                if (Target.SamplesQueue.Length >= MaxDataPoints)
+                    Target.SamplesQueue.Clear(1);
+
+                Target.SamplesQueue.Enqueue(sample);
+
+                Interlocked.Increment(ref Target.m_TotalSampleCount);
+
                 unchecked
                 {
-                    Target.m_LifetimeSamplesSum += sampleValue;
+                    Target.m_LifetimeSamplesSum += sample.DoubleValue;
+                    Target.m_LifetimeSampleCount += 1;
                 }
+
+                Target.RecomputeStatistics();
             }
         }
 
         public void Dispose()
         {
-            if (Interlocked.Read(ref HasCommitted) == 0)
-                throw new InvalidOperationException($"Unable to record datum without a call to '{nameof(Commit)}'");
+            // placeholder
         }
     }
 
 }
 
-internal readonly struct Sample<T>(double elapsedSeconds, T value)
+internal readonly struct Sample<T>
     where T : unmanaged, INumber<T>
 {
-    public readonly double ElapsedSeconds = elapsedSeconds;
-    public readonly T Value = value;
+    public Sample(double elapsedSeconds, T value)
+    {
+        ElapsedSeconds = elapsedSeconds;
+        Value = value;
+        DoubleValue = ToDouble(value);
+        Rate = DoubleValue / elapsedSeconds;
+    }
+
+    public readonly double ElapsedSeconds;
+    public readonly T Value;
+    public readonly double Rate;
+    public readonly double DoubleValue;
+
+    private static double ToDouble(T val) => val is double doubleVal
+        ? doubleVal
+        : val is int intVal
+        ? intVal
+        : val is long longVal
+        ? longVal
+        : val is decimal decimalVal
+        ? System.Convert.ToDouble(decimalVal)
+        : val is short shortVal
+        ? shortVal
+        : val is float floatVal
+        ? floatVal
+        : val is uint uintVal
+        ? uintVal
+        : val is ulong ulongVal
+        ? ulongVal
+        : val is ushort ushortVal
+        ? ushortVal
+        : val is byte byteVal
+        ? byteVal
+        : double.Parse(val.ToString() ?? "0", CultureInfo.InvariantCulture);
 }
 
 internal interface ISampleRecorder<T> : IDisposable
