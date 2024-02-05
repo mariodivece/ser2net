@@ -34,6 +34,7 @@
 	<ItemGroup>
 	  <None Remove="Resources\icon.ico" />
 	  <None Remove="Resources\install-win.ps1" />
+	  <None Remove="Resources\unoser2net.service" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -47,6 +48,7 @@
 	<ItemGroup>
 	  <EmbeddedResource Include="Resources\icon.ico" />
 	  <EmbeddedResource Include="Resources\install-win.ps1" />
+	  <EmbeddedResource Include="Resources\unoser2net.service" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,0 +1,17 @@
+[Unit]
+Description=unoser2net
+After=network.target
+
+[Service]
+Type=notify
+ExecStart=/opt/bin/unoser2net
+WorkingDirectory=/opt/bin/unoser2net
+StandardOutput=null
+StandardError=inherit
+WatchdogSec=10s
+Restart=always
+RestartSec=10s
+User=pi
+
+[Install]
+WantedBy=multi-user.target
