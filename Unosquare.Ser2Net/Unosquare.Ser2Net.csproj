@@ -7,7 +7,7 @@
 		<LangVersion>latest</LangVersion>
 		<OutputType>exe</OutputType>
 		<AssemblyName>unoser2net</AssemblyName>
-		<Version>2024.1.30-b5</Version>
+		<Version>2024.2.15-b6</Version>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<PublishAot>true</PublishAot>
 		<AnalysisMode>all</AnalysisMode>

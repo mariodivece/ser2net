@@ -2,12 +2,11 @@
 
 internal static partial class LoggerExtensions
 {
-    [LoggerMessage(LogLevel.Information, "[{Source,-14}][{ConnectionIndex}] {OP} Total: {Total,16}    Rate: {Rate,19}")]
-    internal static partial void LogDataStatistics(this ILogger logger, string source, int connectionIndex, TransferType op, string total, string rate);
+    [LoggerMessage(LogLevel.Information, "[{Source,-14}][{ConnectionIndex}] {OP} Total: {Total,16}  Rate: {Rate,16}  Peak: {Peak,16}")]
+    internal static partial void LogDataStatistics(this ILogger logger, string source, int connectionIndex, string op, string total, string rate, string peak);
 
-
-    [LoggerMessage(LogLevel.Information, "[{Source,-14}] Service is starting . . .")]
-    internal static partial void LogServiceStarting(this ILogger<RootWorkerService> logger, string source);
+    [LoggerMessage(LogLevel.Information, "[{Source,-14}] Service v.{Version} is starting.")]
+    internal static partial void LogServiceStarting(this ILogger<RootWorkerService> logger, string source, Version version);
 
     [LoggerMessage(LogLevel.Critical, "[{Source,-14}] Service exited because of an unhandled exception")]
     internal static partial void LogServiceError(this ILogger<RootWorkerService> logger, string source, Exception ex);

@@ -13,7 +13,8 @@ internal static class StatisticsExtensions
 
         var total = stats.LifetimeSamplesSum.ToBits();
         var rate = stats.CurrentNaturalRate.HasValue ? $"{((double)stats.CurrentNaturalRate).ToBits()}/s." : "N/A";
-        logger.LogDataStatistics(source, connectionIndex, op, total, rate);
+        var peak = stats.CurrentRatesMax.HasValue ? $"{((double)stats.CurrentRatesMax).ToBits()}/s." : "N/A";
+        logger.LogDataStatistics(source, connectionIndex, op.ToString(), total, rate, peak);
     }
 
     private static string ToBits(this double byteLength)

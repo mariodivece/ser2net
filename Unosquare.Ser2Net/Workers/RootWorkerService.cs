@@ -44,7 +44,7 @@ internal sealed class RootWorkerService :
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        Logger.LogServiceStarting(LoggerName);
+        Logger.LogServiceStarting(LoggerName, typeof(Program).Assembly.GetName().Version ?? new Version());
 
         try
         {
