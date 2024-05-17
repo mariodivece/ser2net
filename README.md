@@ -34,6 +34,17 @@ Since a few of us use Hyper-V to run or test [Home Assistant](https://www.home-a
   1. Once your settings seem correct, you can either run `unoser2net.exe` in a terminal/console window to watch the output and test your settings. It will also create some log file in the folder the program is running.
   1. If your settings are correct, stop the program with `Ctrl+C` and proceed to install the program as a WIndows service: `unoser2net.exe --install`. Log files will be created but there will be no console output. You can always remove the service by running `unoser2net.exe --remove`.
 
+### Connecting Zigbee2MQTT to your unoser2net service.
+
+Follow setp 3 in [this guide](https://www.zigbee2mqtt.io/advanced/remote-adapter/connect_to_a_remote_adapter.html). That is, edit your Zigbee2MQTT `configuration.yaml` file. Where you need to replace `192.168.2.13` with the actual IP of your Hyper-V host, and the port is what you previosuly set in your `PortNumber`.
+
+```yaml
+serial:
+    port: 'tcp://192.168.2.13:20108'
+```
+
+Make sure you start/restart the Zigbee2MQTT add-on/service.
+
 ## Important Notices
 
   - As of right now, there is no plan to support SSL or [RFC2217](https://datatracker.ietf.org/doc/html/rfc2217).
